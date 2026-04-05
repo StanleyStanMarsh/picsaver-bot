@@ -11,4 +11,10 @@ dependencies:
   - pytorch::pytorch
   - conda-forge::timm
   - einops
+  - python-dotenv
+  - conda-forge::rq
+  - loguru
+  - pip:
+    - aiogram
+    - aiohttp-socks
 prefix: /opt/homebrew/anaconda3/envs/picsaver
