@@ -14,6 +14,7 @@ dependencies:
   - python-dotenv
   - conda-forge::rq
   - loguru
+  - tenacity
   - pip:
     - aiogram
     - aiohttp-socks

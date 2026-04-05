@@ -1,13 +1,10 @@
-import socket
-
 from aiogram.client.session.aiohttp import AiohttpSession
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
-import aiohttp
 
-from bot_service.config import BOT_TOKEN, PROXY_FULL_ADDRESS, PROXY_KEY
+from bot_service.config import BOT_TOKEN, PROXY_FULL_ADDRESS
 from bot_service.handlers import inline_router, messages_router
 
 from utils import APP_CTX

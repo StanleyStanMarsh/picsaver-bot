@@ -3,7 +3,7 @@ import uuid
 from aiogram import Router, types
 from aiogram.types import InlineQueryResultCachedPhoto
 
-from bot_service.tools.images import get_user_images
+from media_service.tools import get_user_images
 
 router = Router()
 
@@ -25,6 +25,6 @@ async def inline_query(query: types.InlineQuery):
 
     await query.answer(
         results,
-        cache_time=300,
+        cache_time=10,
         is_personal=True
     )

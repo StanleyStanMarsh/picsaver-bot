@@ -217,6 +217,11 @@ poetry.toml
 # LSP config files
 pyrightconfig.json
 
+### Redis ###
+# Ignore redis binary dump (dump.rdb) files
+
+*.rdb
+
 # End of https://www.toptal.com/developers/gitignore/api/jupyternotebooks,macos,python
 
 
