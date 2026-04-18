@@ -1,3 +1,5 @@
+import warnings
+
 from redis import Redis
 from rq import Worker
 
@@ -17,5 +19,6 @@ redis_conn = Redis(
 
 
 if __name__ == "__main__":
+    warnings.warn("This worker is deprecated and will be removed in the future")
     worker = Worker(queues, connection=redis_conn, name="Image Reader")
     worker.work()

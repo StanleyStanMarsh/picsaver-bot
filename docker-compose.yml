@@ -1,0 +1,62 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: bot-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - bot-network
+
+  save-worker:
+    build:
+      context: .
+      dockerfile: save-worker.Dockerfile
+    image: picsaver-save-worker:local
+    platform: linux/amd64
+    container_name: bot-save-worker
+    restart: unless-stopped
+    environment:
+      QUEUE_ADDRESS: redis
+      QUEUE_PORT: "6379"
+    env_file:
+      - .env
+    volumes:
+      - images-data:/workspace/images
+    depends_on:
+      - redis
+    networks:
+      - bot-network
+
+  bot:
+    build:
+      context: .
+      dockerfile: bot.Dockerfile
+    platform: linux/amd64
+    image: picsaver-bot:local
+    container_name: bot-main
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      QUEUE_ADDRESS: redis
+      QUEUE_PORT: "6379"
+    env_file:
+      - .env
+    volumes:
+      - images-data:/workspace/src/images
+    depends_on:
+      - redis
+      - save-worker
+    networks:
+      - bot-network
+
+volumes:
+  redis-data:
+  images-data:
+
+networks:
+  bot-network:
+    driver: bridge
