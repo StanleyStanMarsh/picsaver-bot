@@ -17,6 +17,8 @@ dependencies:
   - tenacity
   - pip:
     - asyncpg
+    - "sqlalchemy[asyncio]"
+    - greenlet
     - aiogram
     - aiohttp-socks
 prefix: /opt/homebrew/anaconda3/envs/picsaver
