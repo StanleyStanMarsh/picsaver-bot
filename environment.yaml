@@ -16,6 +16,7 @@ dependencies:
   - loguru
   - tenacity
   - pip:
+    - asyncpg
     - aiogram
     - aiohttp-socks
 prefix: /opt/homebrew/anaconda3/envs/picsaver
