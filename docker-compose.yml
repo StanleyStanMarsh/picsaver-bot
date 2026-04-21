@@ -10,6 +10,50 @@ services:
     networks:
       - bot-network
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: bot-postgres
+    restart: unless-stopped
+    environment:
+      # No insecure defaults in "prod-like" config:
+      # set these in .env (or deployment environment)
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    networks:
+      - bot-network
+
+  migrate:
+    build:
+      context: .
+      dockerfile: migrate.Dockerfile
+    image: picsaver-migrate:local
+    platform: linux/amd64
+    container_name: bot-migrate
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      QUEUE_ADDRESS: redis
+      QUEUE_PORT: "6379"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - bot-network
+
   save-worker:
     build:
       context: .
@@ -21,12 +65,19 @@ services:
     environment:
       QUEUE_ADDRESS: redis
       QUEUE_PORT: "6379"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
     env_file:
       - .env
     volumes:
       - images-data:/workspace/images
     depends_on:
       - redis
+      - postgres
+      - migrate
     networks:
       - bot-network
 
@@ -43,6 +94,11 @@ services:
     environment:
       QUEUE_ADDRESS: redis
       QUEUE_PORT: "6379"
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
     env_file:
       - .env
     volumes:
@@ -50,12 +106,15 @@ services:
     depends_on:
       - redis
       - save-worker
+      - postgres
+      - migrate
     networks:
       - bot-network
 
 volumes:
   redis-data:
   images-data:
+  pg-data:
 
 networks:
   bot-network:

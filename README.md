@@ -1,5 +1,5 @@
 ## Environment
-To start the bot add `.env` file in the root directory of the project. Fill it wtih this variables:
+To start the bot create a `.env` file in the project root (you can copy from `.env.example`) and fill in variables:
 
 ```ini
 BOT_TOKEN=...
@@ -7,6 +7,11 @@ BOT_TOKEN=...
 PROXY_PROTO=socks5
 PROXY_ADDRESS=x.x.x.x
 PROXY_PORT=xxxx
+
+# Postgres (used by docker-compose)
+DB_NAME=picsaver
+DB_USER=picsaver
+DB_PASSWORD=change_me
 ```
 
 > To use the bot you need to have VPN
@@ -20,7 +25,15 @@ To start the application via Docker Compose:
     ```ini
     PROXY_ADDRESS=host.docker.internal
     ```
-2) And then run command:
+2) Run migrations (creates/updates Postgres schema):
+    ```bash
+    docker compose run --rm migrate
+    ```
+3) Start the services:
     ```bash
     docker compose up -d
     ```
+
+### Notes
+- `migrate` uses Alembic migrations from `migrations/` and applies them to Postgres.
+- `.env` is ignored by git. Commit `.env.example` instead.
