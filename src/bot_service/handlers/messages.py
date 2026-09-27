@@ -2,8 +2,6 @@ import asyncio
 
 from aiogram import Bot
 from aiogram import Router, types, F
-from aiogram.filters import CommandStart
-from aiogram.types import Message
 
 from utils import APP_CTX
 
@@ -37,8 +35,3 @@ async def save_and_notify(message: types.Message, bot: Bot, file_id: str):
     )
 
     await message.reply("✅ Изображение сохранено")
-
-
-@router.message(CommandStart())
-async def cmd_start(message: Message):
-    await message.answer('Добро пожаловать')
