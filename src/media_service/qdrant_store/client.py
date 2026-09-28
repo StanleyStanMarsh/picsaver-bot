@@ -64,6 +64,25 @@ def upsert_image_vector(
     )
 
 
+def delete_image_vector(
+    *,
+    image_id: UUID,
+    client: QdrantClient | None = None,
+) -> None:
+    client = client or get_qdrant_client()
+    try:
+        client.delete(
+            collection_name=COLLECTION,
+            points_selector=models.PointIdsList(points=[str(image_id)]),
+        )
+    except Exception:
+        # Collection may not exist yet — nothing to delete
+        names = {c.name for c in client.get_collections().collections}
+        if COLLECTION not in names:
+            return
+        raise
+
+
 def search_user_images(
     *,
     vector: list[float],

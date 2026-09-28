@@ -125,6 +125,7 @@ services:
       QDRANT_URL: http://qdrant:6333
       QDRANT_COLLECTION: user_images
       CLIP_VECTOR_SIZE: "1024"
+      WEBAPP_URL: ${WEBAPP_URL:-}
     env_file:
       - .env
     volumes:
@@ -135,8 +136,42 @@ services:
       - postgres
       - qdrant
       - migrate
+      - webapp
     networks:
       - bot-network
+
+  # Telegram Mini App (gallery + delete). Public HTTPS via nginx → webapp:8080
+  webapp:
+    build:
+      context: .
+      dockerfile: webapp.Dockerfile
+    image: picsaver-webapp:local
+    platform: linux/amd64
+    container_name: bot-webapp
+    restart: unless-stopped
+    mem_limit: 256m
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_NAME: ${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: user_images
+    env_file:
+      - .env
+    volumes:
+      - images-data:/workspace/images
+    depends_on:
+      - postgres
+      - qdrant
+      - migrate
+    networks:
+      - bot-network
+    # DevOps: nginx TLS terminates here, e.g. proxy_pass http://webapp:8080;
+    # expose only if debugging without nginx:
+    # ports:
+    #   - "8080:8080"
 
 volumes:
   redis-data:
