@@ -1,4 +1,4 @@
-"""Mini App API + static gallery."""
+"""Mini App API + static gallery + password-protected /admin."""
 from __future__ import annotations
 
 import os
@@ -6,7 +6,7 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from media_service.database.delete_image import (
@@ -15,12 +15,26 @@ from media_service.database.delete_image import (
     list_user_images,
     resolve_user_image_path,
 )
+from webapp.admin_auth import require_admin
+from webapp.admin_stats import fetch_user_stats
 from webapp.auth import AuthError, validate_webapp_init_data
 
-STATIC_DIR = Path(__file__).resolve().parent / "static"
+WEBAPP_DIR = Path(__file__).resolve().parent
+STATIC_DIR = WEBAPP_DIR / "static"
+ADMIN_HTML = WEBAPP_DIR / "templates" / "admin.html"
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
 app = FastAPI(title="Picsaver Mini App", docs_url=None, redoc_url=None)
+
+
+@app.middleware("http")
+async def admin_no_store(request, call_next):
+    response: Response = await call_next(request)
+    path = request.url.path
+    if path.startswith("/admin") or path.startswith("/api/admin"):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return response
 
 
 def _extract_init_data(
@@ -73,7 +87,21 @@ def api_delete_image(image_id: UUID, user_id: int = Depends(current_user_id)):
     except ImageNotFoundError:
         raise HTTPException(status_code=404, detail="not found")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"delete failed: {e}") from e
+        raise HTTPException(status_code=500, detail="delete failed") from e
+
+
+@app.get("/api/admin/stats")
+def api_admin_stats(_admin: str = Depends(require_admin)):
+    """Aggregates only — never returns image bytes or paths of other users."""
+    return fetch_user_stats()
+
+
+@app.get("/admin")
+def admin_page(_admin: str = Depends(require_admin)):
+    path = ADMIN_HTML
+    if not path.is_file():
+        raise HTTPException(status_code=500, detail="admin static missing")
+    return FileResponse(path)
 
 
 @app.get("/")

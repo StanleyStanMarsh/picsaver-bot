@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Picsaver Admin</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 24px; max-width: 960px; }
+    h1 { font-size: 1.25rem; margin: 0 0 8px; }
+    .meta { color: #888; margin-bottom: 16px; font-size: 0.9rem; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #4444; }
+    th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: .03em; color: #888; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .err { color: #e53935; }
+  </style>
+</head>
+<body>
+  <h1>Picsaver — admin</h1>
+  <p id="meta" class="meta">Загрузка…</p>
+  <table>
+    <thead>
+      <tr>
+        <th>User</th>
+        <th>ID</th>
+        <th class="num">Live</th>
+        <th class="num">Deleted</th>
+        <th>Last upload (UTC)</th>
+      </tr>
+    </thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <script>
+    function label(u) {
+      if (u.username) return "@" + u.username;
+      const name = [u.first_name, u.last_name].filter(Boolean).join(" ");
+      return name || "—";
+    }
+    function fmt(iso) {
+      if (!iso) return "—";
+      try {
+        return new Date(iso).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+      } catch { return iso; }
+    }
+    async function load() {
+      const meta = document.getElementById("meta");
+      const tbody = document.getElementById("rows");
+      try {
+        const res = await fetch("/api/admin/stats", { credentials: "same-origin" });
+        if (res.status === 401 || res.status === 403) {
+          meta.className = "meta err";
+          meta.textContent = "Нет доступа. Обнови страницу и введи логин admin + пароль.";
+          return;
+        }
+        if (res.status === 429) {
+          meta.className = "meta err";
+          meta.textContent = "Слишком много попыток — подожди несколько минут.";
+          return;
+        }
+        if (!res.ok) {
+          meta.className = "meta err";
+          meta.textContent = "Ошибка " + res.status;
+          return;
+        }
+        const data = await res.json();
+        const t = data.totals || {};
+        meta.className = "meta";
+        meta.textContent =
+          "Users: " + (t.users || 0) +
+          " · live: " + (t.live_photos || 0) +
+          " · deleted: " + (t.deleted_photos || 0);
+        tbody.innerHTML = "";
+        for (const u of data.users || []) {
+          const tr = document.createElement("tr");
+          tr.innerHTML =
+            "<td>" + label(u) + "</td>" +
+            "<td>" + u.user_id + "</td>" +
+            "<td class='num'>" + u.live_photos + "</td>" +
+            "<td class='num'>" + u.deleted_photos + "</td>" +
+            "<td>" + fmt(u.last_upload) + "</td>";
+          tbody.appendChild(tr);
+        }
+      } catch (e) {
+        meta.className = "meta err";
+        meta.textContent = "Сеть/ошибка";
+      }
+    }
+    load();
+  </script>
+</body>
+</html>
