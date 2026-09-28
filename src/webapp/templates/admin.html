@@ -50,13 +50,7 @@
       try {
         const res = await fetch("/api/admin/stats", { credentials: "same-origin" });
         if (res.status === 401 || res.status === 403) {
-          meta.className = "meta err";
-          meta.textContent = "Нет доступа. Обнови страницу и введи логин admin + пароль.";
-          return;
-        }
-        if (res.status === 429) {
-          meta.className = "meta err";
-          meta.textContent = "Слишком много попыток — подожди несколько минут.";
+          window.location.href = "/admin";
           return;
         }
         if (!res.ok) {

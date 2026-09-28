@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex,nofollow" />
+  <title>Picsaver Admin — login</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { font-family: system-ui, sans-serif; margin: 0; min-height: 100vh; display: grid; place-items: center; }
+    form { width: min(360px, 92vw); padding: 24px; border: 1px solid #4444; border-radius: 12px; }
+    h1 { font-size: 1.1rem; margin: 0 0 16px; }
+    label { display: block; font-size: 0.85rem; margin: 12px 0 4px; color: #888; }
+    input { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 8px; border: 1px solid #6666; background: transparent; color: inherit; }
+    button { margin-top: 16px; width: 100%; padding: 10px 12px; border: 0; border-radius: 8px; background: #2aabee; color: #fff; font-weight: 600; cursor: pointer; }
+    .err { color: #e53935; font-size: 0.9rem; margin: 0 0 8px; min-height: 1.2em; }
+    .hint { color: #888; font-size: 0.8rem; margin-top: 12px; }
+  </style>
+</head>
+<body>
+  <form method="post" action="/admin/login" autocomplete="username">
+    <h1>Picsaver — admin</h1>
+    <p class="err">__ERROR__</p>
+    <label for="username">Логин</label>
+    <input id="username" name="username" value="admin" required autocomplete="username" />
+    <label for="password">Пароль</label>
+    <input id="password" name="password" type="password" required autocomplete="current-password" />
+    <button type="submit">Войти</button>
+    <p class="hint">Сессия на 12 часов, cookie HttpOnly.</p>
+  </form>
+</body>
+</html>

@@ -5,8 +5,8 @@ import os
 from pathlib import Path
 from uuid import UUID
 
-from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse, Response
+from fastapi import Depends, FastAPI, Form, Header, HTTPException, Request
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from media_service.database.delete_image import (
@@ -15,13 +15,26 @@ from media_service.database.delete_image import (
     list_user_images,
     resolve_user_image_path,
 )
-from webapp.admin_auth import require_admin
+from webapp.admin_auth import (
+    admin_password,
+    clear_session_cookie,
+    is_locked,
+    mint_session_token,
+    register_login_failure,
+    register_login_success,
+    require_admin_session,
+    set_session_cookie,
+    verify_password,
+    verify_session_token,
+    COOKIE_NAME,
+)
 from webapp.admin_stats import fetch_user_stats
 from webapp.auth import AuthError, validate_webapp_init_data
 
 WEBAPP_DIR = Path(__file__).resolve().parent
 STATIC_DIR = WEBAPP_DIR / "static"
 ADMIN_HTML = WEBAPP_DIR / "templates" / "admin.html"
+LOGIN_HTML = WEBAPP_DIR / "templates" / "login.html"
 BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
 app = FastAPI(title="Picsaver Mini App", docs_url=None, redoc_url=None)
@@ -60,6 +73,13 @@ def current_user_id(
         raise HTTPException(status_code=401, detail=str(e)) from e
 
 
+def _login_page(error: str = "") -> HTMLResponse:
+    html = LOGIN_HTML.read_text(encoding="utf-8")
+    html = html.replace("__ERROR__", error)
+    status = 401 if error else 200
+    return HTMLResponse(html, status_code=status)
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
@@ -91,17 +111,56 @@ def api_delete_image(image_id: UUID, user_id: int = Depends(current_user_id)):
 
 
 @app.get("/api/admin/stats")
-def api_admin_stats(_admin: str = Depends(require_admin)):
-    """Aggregates only — never returns image bytes or paths of other users."""
+def api_admin_stats(request: Request, _admin: str = Depends(require_admin_session)):
     return fetch_user_stats()
 
 
 @app.get("/admin")
-def admin_page(_admin: str = Depends(require_admin)):
-    path = ADMIN_HTML
-    if not path.is_file():
+def admin_page(request: Request):
+    if not admin_password():
+        raise HTTPException(status_code=503, detail="admin disabled")
+    if not ADMIN_HTML.is_file() or not LOGIN_HTML.is_file():
         raise HTTPException(status_code=500, detail="admin static missing")
-    return FileResponse(path)
+
+    token = request.cookies.get(COOKIE_NAME)
+    if verify_session_token(token):
+        return FileResponse(ADMIN_HTML)
+    return _login_page()
+
+
+@app.post("/admin/login")
+async def admin_login(
+    request: Request,
+    username: str = Form(default=""),
+    password: str = Form(default=""),
+):
+    if not admin_password():
+        raise HTTPException(status_code=503, detail="admin disabled")
+
+    if is_locked(request):
+        return _login_page("Слишком много попыток. Подожди несколько минут.")
+
+    # Empty submit — show form again, do not burn fail budget
+    if not password:
+        return _login_page("Введи пароль.")
+
+    if not verify_password(username, password):
+        register_login_failure(request)
+        if is_locked(request):
+            return _login_page("Слишком много попыток. Подожди несколько минут.")
+        return _login_page("Неверный логин или пароль.")
+
+    register_login_success(request)
+    response = RedirectResponse(url="/admin", status_code=303)
+    set_session_cookie(response, mint_session_token())
+    return response
+
+
+@app.post("/admin/logout")
+def admin_logout():
+    response = RedirectResponse(url="/admin", status_code=303)
+    clear_session_cookie(response)
+    return response
 
 
 @app.get("/")
