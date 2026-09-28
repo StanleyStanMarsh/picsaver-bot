@@ -1,24 +1,29 @@
 name: picsaver
 channels:
   - defaults
+  - pytorch
+  - conda-forge
 dependencies:
   - python=3.11
-  - jupyter
-  - transformers
   - pillow
   - qdrant-client
-  - pytorch::torchvision
   - pytorch::pytorch
+  - pytorch::torchvision
+  - conda-forge::transformers
   - conda-forge::timm
   - einops
   - python-dotenv
   - conda-forge::rq
+  - redis-py
   - loguru
   - tenacity
+  - pip
   - pip:
     - asyncpg
     - "sqlalchemy[asyncio]"
+    - "psycopg[binary]"
     - greenlet
     - aiogram
     - aiohttp-socks
-prefix: /opt/homebrew/anaconda3/envs/picsaver
+    - aiofiles
+    - requests

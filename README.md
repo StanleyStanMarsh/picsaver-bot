@@ -1,39 +1,21 @@
-## Environment
-To start the bot create a `.env` file in the project root (you can copy from `.env.example`) and fill in variables:
+# picsaver-bot
 
-```ini
-BOT_TOKEN=...
+Personal Telegram bot: save photos in DM, semantic search via inline query (Jina CLIP v2 + Qdrant).
 
-PROXY_PROTO=socks5
-PROXY_ADDRESS=x.x.x.x
-PROXY_PORT=xxxx
+## Stack
+- Python / aiogram (polling)
+- Redis + RQ (save + text-embed jobs on one CLIP worker)
+- Postgres (users + images metadata)
+- Qdrant (image embeddings, dim 1024, cosine)
+- `jinaai/jina-clip-v2` on CPU (personal / non-commercial license)
 
-# Postgres (used by docker-compose)
-DB_NAME=picsaver
-DB_USER=picsaver
-DB_PASSWORD=change_me
-```
+## Quick start (Docker)
+1. Copy `.env.example` → `.env` and set `BOT_TOKEN`, DB password, proxy if needed.
+2. `docker compose run --rm migrate`
+3. `docker compose up -d --build`
+4. Open the bot, `/start`, send a photo, then `@your_bot query` in any chat.
 
-> To use the bot you need to have VPN
-
-## Docker compose
-Install Docker.
-
-To start the application via Docker Compose:
-
-1) Edit the `PROXY_ADDRESS` in `.env` file as written below if you use proxy with VPN connection:
-    ```ini
-    PROXY_ADDRESS=host.docker.internal
-    ```
-2) Run migrations (creates/updates Postgres schema):
-    ```bash
-    docker compose run --rm migrate
-    ```
-3) Start the services:
-    ```bash
-    docker compose up -d
-    ```
-
-### Notes
-- `migrate` uses Alembic migrations from `migrations/` and applies them to Postgres.
-- `.env` is ignored by git. Commit `.env.example` instead.
+## Branches
+- `main` — CLIP notebook experiments
+- `dev/base` — early bot + RQ + filesystem meta
+- `dev/db` — Postgres + compose + CLIP/Qdrant search pipeline

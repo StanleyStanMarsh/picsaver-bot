@@ -1,23 +1,32 @@
-import json
-from pathlib import Path
+from sqlalchemy import select
 
-IMAGES_DIR = Path("images")
+from db.models import Image
+from db.session import get_sessionmaker
+
+# seed: ready = 3
+INDEX_STATUS_READY = 3
 
 
-async def get_images(user_id: int):
-    """
-    Получаем список изображений пользователя напрямую из meta.json
-    """
-    user_dir = IMAGES_DIR / str(user_id)
-    meta_file = user_dir / "meta.json"
-
-    if not meta_file.exists():
-        return []
-
-    import aiofiles
-
-    async with aiofiles.open(meta_file, "r", encoding="utf-8") as f:
-        content = await f.read()
-        if content:
-            return json.loads(content)
-        return []
+async def get_images(user_id: int, limit: int = 50):
+    """Latest ready images for user from Postgres (telegram file_id for inline)."""
+    Session = get_sessionmaker()
+    async with Session() as session:
+        result = await session.scalars(
+            select(Image)
+            .where(
+                Image.user_id == user_id,
+                Image.deleted_at.is_(None),
+                Image.index_status == INDEX_STATUS_READY,
+            )
+            .order_by(Image.created_at.desc())
+            .limit(limit)
+        )
+        rows = result.all()
+        return [
+            {
+                "file_id": row.telegram_file_id,
+                "image_id": str(row.image_id),
+                "local_path": row.path,
+            }
+            for row in rows
+        ]

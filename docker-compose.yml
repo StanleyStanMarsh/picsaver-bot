@@ -3,8 +3,7 @@ services:
     image: redis:7-alpine
     container_name: bot-redis
     restart: unless-stopped
-    ports:
-      - "6379:6379"
+    mem_limit: 256m
     volumes:
       - redis-data:/data
     networks:
@@ -14,9 +13,8 @@ services:
     image: postgres:16-alpine
     container_name: bot-postgres
     restart: unless-stopped
+    mem_limit: 768m
     environment:
-      # No insecure defaults in "prod-like" config:
-      # set these in .env (or deployment environment)
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
@@ -27,6 +25,16 @@ services:
       interval: 3s
       timeout: 5s
       retries: 20
+    networks:
+      - bot-network
+
+  qdrant:
+    image: qdrant/qdrant:v1.13.2
+    container_name: bot-qdrant
+    restart: unless-stopped
+    mem_limit: 768m
+    volumes:
+      - qdrant-data:/qdrant/storage
     networks:
       - bot-network
 
@@ -62,6 +70,7 @@ services:
     platform: linux/amd64
     container_name: bot-save-worker
     restart: unless-stopped
+    mem_limit: 6144m
     environment:
       QUEUE_ADDRESS: redis
       QUEUE_PORT: "6379"
@@ -70,13 +79,23 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: user_images
+      CLIP_MODEL_NAME: jinaai/jina-clip-v2
+      CLIP_VECTOR_SIZE: "1024"
+      CLIP_DEVICE: cpu
+      OMP_NUM_THREADS: "2"
+      MKL_NUM_THREADS: "2"
+      HF_HOME: /workspace/.cache/huggingface
     env_file:
       - .env
     volumes:
       - images-data:/workspace/images
+      - hf-cache:/workspace/.cache/huggingface
     depends_on:
       - redis
       - postgres
+      - qdrant
       - migrate
     networks:
       - bot-network
@@ -89,6 +108,7 @@ services:
     image: picsaver-bot:local
     container_name: bot-main
     restart: unless-stopped
+    mem_limit: 512m
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -99,14 +119,18 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
+      QDRANT_URL: http://qdrant:6333
+      QDRANT_COLLECTION: user_images
+      CLIP_VECTOR_SIZE: "1024"
     env_file:
       - .env
     volumes:
-      - images-data:/workspace/src/images
+      - images-data:/workspace/images
     depends_on:
       - redis
       - save-worker
       - postgres
+      - qdrant
       - migrate
     networks:
       - bot-network
@@ -115,6 +139,8 @@ volumes:
   redis-data:
   images-data:
   pg-data:
+  qdrant-data:
+  hf-cache:
 
 networks:
   bot-network:

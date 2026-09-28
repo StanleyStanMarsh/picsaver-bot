@@ -15,9 +15,7 @@ logger = APP_CTX.get_logger()
 
 
 async def main():
-    # auth = BasicAuth(PROXY_KEY)
-    session = AiohttpSession(proxy=PROXY_FULL_ADDRESS)
-
+    session = AiohttpSession(proxy=PROXY_FULL_ADDRESS) if PROXY_FULL_ADDRESS else AiohttpSession()
 
     bot = Bot(
         token=BOT_TOKEN,
@@ -33,7 +31,10 @@ async def main():
     dp.include_router(commands_router)
     dp.include_router(inline_router)
 
-    logger.info(f"Connecting to Telegram API via proxy: {PROXY_FULL_ADDRESS}")
+    if PROXY_FULL_ADDRESS:
+        logger.info("Connecting to Telegram API via proxy")
+    else:
+        logger.info("Connecting to Telegram API without proxy")
 
     try:
         await dp.start_polling(bot)
