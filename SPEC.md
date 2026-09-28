@@ -161,9 +161,9 @@ Save и text-embed идут в **одну** очередь `save` на **одн�
 ## 9. Деплой (кратко)
 
 1. Ветка `dev/db`, `.env` из `.env.example` (`BOT_TOKEN`, DB, `WEBAPP_URL`, `ADMIN_PASSWORD`).
-2. Публичный HTTPS на `webapp:8080`.
+2. Публичный HTTPS: на проде используется доп. файл `docker-compose.proxy.yml` + **Caddy** (Let’s Encrypt) → `webapp:8080`. Базовый `docker-compose.yml` сам TLS не поднимает.
 3. `docker compose run --rm migrate`
-4. `docker compose up -d --build`
+4. Стек: `docker compose up -d --build` (и proxy-override, как на сервере).
 5. Первый save/search может быть долгим (warmup / download весов).
 
 Проверка: `/start` → фото → inline → Open (галерея) → `/admin` (агрегаты).
