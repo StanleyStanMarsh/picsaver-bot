@@ -1,8 +1,11 @@
+import os
+
 from aiogram.client.session.aiohttp import AiohttpSession
 
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
+from aiogram.types import MenuButtonWebApp, WebAppInfo
 
 from bot_service.config import BOT_TOKEN, PROXY_FULL_ADDRESS
 from bot_service.handlers import commands_router, inline_router, messages_router
@@ -12,6 +15,18 @@ from db.session import dispose_engine, init_engine
 
 
 logger = APP_CTX.get_logger()
+
+
+async def _configure_menu_button(bot: Bot) -> None:
+    """Menu Button next to the message input → Mini App (label Open)."""
+    url = (os.getenv("WEBAPP_URL") or "").strip()
+    if not url:
+        logger.warning("WEBAPP_URL empty — Menu Button not set")
+        return
+    await bot.set_chat_menu_button(
+        menu_button=MenuButtonWebApp(text="Open", web_app=WebAppInfo(url=url))
+    )
+    logger.info("Menu Button set to Open → %s", url)
 
 
 async def main():
@@ -26,6 +41,7 @@ async def main():
     dp = Dispatcher()
 
     await init_engine()
+    await _configure_menu_button(bot)
 
     dp.include_router(messages_router)
     dp.include_router(commands_router)
