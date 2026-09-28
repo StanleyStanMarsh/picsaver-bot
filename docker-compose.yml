@@ -70,7 +70,7 @@ services:
     platform: linux/amd64
     container_name: bot-save-worker
     restart: unless-stopped
-    mem_limit: 6144m
+    mem_limit: 9216m
     environment:
       QUEUE_ADDRESS: redis
       QUEUE_PORT: "6379"
