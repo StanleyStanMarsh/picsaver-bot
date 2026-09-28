@@ -1,0 +1,15 @@
+transformers>=4.40
+accelerate>=0.27
+pillow>=10.0
+qdrant-client>=1.9
+einops>=0.7
+timm>=0.9
+python-dotenv>=1.0
+rq>=1.16
+redis>=5.0
+loguru>=0.7
+tenacity>=8.2
+SQLAlchemy>=2.0
+psycopg[binary]>=3.1
+requests>=2.31
+aiofiles>=23.2

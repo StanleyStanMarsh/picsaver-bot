@@ -1,30 +1,30 @@
-FROM continuumio/miniconda3:latest
+FROM python:3.11-slim-bookworm
 
 WORKDIR /workspace
 
-# System OpenMP runtime required by PyTorch (libgomp.so.1)
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libgomp1 \
+    && apt-get install -y --no-install-recommends \
+        libgomp1 \
+        ca-certificates \
+        git \
     && rm -rf /var/lib/apt/lists/*
 
-COPY environment.yaml .
+# Official CPU wheel avoids conda MKL/iJIT symbol breakage
+COPY requirements-worker.txt .
+RUN pip install --no-cache-dir --upgrade pip \
+    && pip install --no-cache-dir torch torchvision \
+        --index-url https://download.pytorch.org/whl/cpu \
+    && pip install --no-cache-dir -r requirements-worker.txt
 
-ENV CONDA_PLUGINS_AUTO_ACCEPT_TOS=true
+COPY src /workspace/src
 
-RUN conda env create -f environment.yaml \
-    && conda install -y -n picsaver -c conda-forge libgomp \
-    && conda clean -afy
-
-ENV PATH=/opt/conda/envs/picsaver/bin:$PATH \
-    PYTHONPATH=/workspace/src \
+ENV PYTHONPATH=/workspace/src \
     PYTHONUNBUFFERED=1 \
     MKL_THREADING_LAYER=GNU \
     KMP_DUPLICATE_LIB_OK=TRUE \
     OMP_NUM_THREADS=2 \
     MKL_NUM_THREADS=2 \
-    LD_LIBRARY_PATH=/opt/conda/envs/picsaver/lib:/usr/lib/x86_64-linux-gnu
-
-COPY src /workspace/src
+    CLIP_WARMUP=0
 
 WORKDIR /workspace/src
 
