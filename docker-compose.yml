@@ -86,6 +86,9 @@ services:
       CLIP_DEVICE: cpu
       OMP_NUM_THREADS: "2"
       MKL_NUM_THREADS: "2"
+      MKL_THREADING_LAYER: GNU
+      KMP_DUPLICATE_LIB_OK: "TRUE"
+      CLIP_WARMUP: "0"
       HF_HOME: /workspace/.cache/huggingface
     env_file:
       - .env

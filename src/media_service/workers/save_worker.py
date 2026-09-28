@@ -16,7 +16,7 @@ redis_conn = Redis(host=QUEUE_ADDRESS, port=QUEUE_PORT, db=0)
 
 def _warmup_clip():
     """Load jina-clip-v2 once at worker start so first user job is faster."""
-    if os.getenv("CLIP_WARMUP", "1") != "1":
+    if os.getenv("CLIP_WARMUP", "0") != "1":
         return
     try:
         from media_service.clip.encoder import embed_text
