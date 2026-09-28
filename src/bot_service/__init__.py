@@ -1,3 +1,1 @@
-__all__ = ["main"]
-
-from .bot import main
+"""Bot service package (handlers live in submodules; avoid importing bot.main here)."""

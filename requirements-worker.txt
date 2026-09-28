@@ -13,3 +13,4 @@ SQLAlchemy>=2.0
 psycopg[binary]>=3.1
 requests>=2.31
 aiofiles>=23.2
+greenlet>=3.0
