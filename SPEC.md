@@ -121,7 +121,7 @@ Save и text-embed идут в **одну** очередь `save` на **одн�
 Снаружи: reverse-proxy + TLS → `webapp:8080`.
 
 Публичный Mini App / admin (текущий стенд): `https://64-188-62-192.sslip.io/`  
-(`WEBAPP_URL` в `.env`; Menu Button Open + кнопка на `/start`).
+(`WEBAPP_URL` в `.env`; на `/start` только Menu Button **Open** рядом со строкой ввода — отдельной WebApp-кнопки в тексте сообщения нет).
 
 Очередь: один `save-worker`. Сервиса `read-worker` нет.
 
