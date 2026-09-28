@@ -21,6 +21,8 @@ _fail_count: dict[str, int] = defaultdict(int)
 _MAX_FAILS = 10
 _LOCK_SEC = 300
 
+_CHALLENGE = {"WWW-Authenticate": 'Basic realm="picsaver-admin", charset="UTF-8"'}
+
 
 def _client_ip(request: Request) -> str:
     forwarded = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
@@ -31,12 +33,16 @@ def _client_ip(request: Request) -> str:
     return "unknown"
 
 
-def _check_throttle(ip: str) -> None:
+def _locked(ip: str) -> bool:
     now = time.time()
     with _fail_lock:
         until = _fail_until.get(ip, 0.0)
         if until > now:
-            raise HTTPException(status_code=429, detail="too many attempts")
+            return True
+        if until and until <= now:
+            _fail_until.pop(ip, None)
+            _fail_count.pop(ip, None)
+        return False
 
 
 def _register_failure(ip: str) -> None:
@@ -70,20 +76,31 @@ def require_admin(
         raise HTTPException(status_code=503, detail="admin disabled")
 
     ip = _client_ip(request)
-    _check_throttle(ip)
 
-    challenge = {"WWW-Authenticate": 'Basic realm="picsaver-admin", charset="UTF-8"'}
+    # Always keep WWW-Authenticate so the browser can show the login dialog,
+    # including while rate-limited.
+    if _locked(ip):
+        raise HTTPException(
+            status_code=429,
+            detail="too many attempts",
+            headers=dict(_CHALLENGE),
+        )
 
     if credentials is None:
-        # Missing creds: challenge browser; do not count as hard fail spam the same way
-        raise HTTPException(status_code=401, detail="unauthorized", headers=challenge)
+        raise HTTPException(status_code=401, detail="unauthorized", headers=dict(_CHALLENGE))
+
+    # Cancel / empty Basic probe — challenge again, do not burn the fail budget.
+    if not credentials.username.strip() and not credentials.password:
+        raise HTTPException(status_code=401, detail="unauthorized", headers=dict(_CHALLENGE))
 
     user_ok = _const_eq(credentials.username, "admin")
     pass_ok = _const_eq(credentials.password, expected)
 
     if not (user_ok and pass_ok):
-        _register_failure(ip)
-        raise HTTPException(status_code=401, detail="unauthorized", headers=challenge)
+        # Count only real password attempts (non-empty password).
+        if credentials.password:
+            _register_failure(ip)
+        raise HTTPException(status_code=401, detail="unauthorized", headers=dict(_CHALLENGE))
 
     _register_success(ip)
     return "admin"
