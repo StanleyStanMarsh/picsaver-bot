@@ -14,7 +14,6 @@ from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_ex
 from bot_service.config import BOT_TOKEN, PROXY_FULL_ADDRESS
 from db.models import Image
 from db.sync_session import get_sync_sessionmaker
-from media_service.clip import embed_image_path
 from media_service.paths import IMAGES_DIR
 from media_service.qdrant_store import upsert_image_vector
 
@@ -110,6 +109,8 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
         session.commit()
 
     try:
+        from media_service.clip import embed_image_path
+
         vector = embed_image_path(str(save_path))
         upsert_image_vector(
             image_id=image_id,
