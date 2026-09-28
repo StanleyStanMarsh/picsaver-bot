@@ -2,7 +2,7 @@ import logging
 import os
 
 from redis import Redis
-from rq import Worker
+from rq import SimpleWorker
 
 from redis_queue import QUEUE_ADDRESS, QUEUE_PORT
 
@@ -15,13 +15,13 @@ redis_conn = Redis(host=QUEUE_ADDRESS, port=QUEUE_PORT, db=0)
 
 
 def _warmup_clip():
-    """Load jina-clip-v2 once at worker start so first user job is faster."""
-    if os.getenv("CLIP_WARMUP", "0") != "1":
+    """Load jina-clip-v2 once in the parent process (SimpleWorker, no fork)."""
+    if os.getenv("CLIP_WARMUP", "1") != "1":
         return
     try:
         from media_service.clip.encoder import embed_text
 
-        logger.info("Warming up CLIP model...")
+        logger.info("Warming up CLIP model in parent...")
         embed_text("warmup")
         logger.info("CLIP warmup done")
     except Exception:
@@ -36,5 +36,6 @@ if __name__ == "__main__":
         ensure_collection()
     except Exception:
         logger.exception("Qdrant ensure_collection failed at startup")
-    worker = Worker(queues, connection=redis_conn, name="Image Saver")
+    # SimpleWorker runs jobs in-process: no fork → no CoW/OOM spike on CLIP load
+    worker = SimpleWorker(queues, connection=redis_conn, name="Image Saver")
     worker.work()

@@ -24,7 +24,7 @@ ENV PYTHONPATH=/workspace/src \
     KMP_DUPLICATE_LIB_OK=TRUE \
     OMP_NUM_THREADS=2 \
     MKL_NUM_THREADS=2 \
-    CLIP_WARMUP=0
+    CLIP_WARMUP=1
 
 WORKDIR /workspace/src
 

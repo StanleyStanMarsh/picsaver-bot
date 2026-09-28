@@ -88,7 +88,7 @@ services:
       MKL_NUM_THREADS: "2"
       MKL_THREADING_LAYER: GNU
       KMP_DUPLICATE_LIB_OK: "TRUE"
-      CLIP_WARMUP: "0"
+      CLIP_WARMUP: "1"
       HF_HOME: /workspace/.cache/huggingface
     env_file:
       - .env
