@@ -43,8 +43,8 @@ async def main():
     await init_engine()
     await _configure_menu_button(bot)
 
-    dp.include_router(messages_router)
     dp.include_router(commands_router)
+    dp.include_router(messages_router)
     dp.include_router(inline_router)
 
     if PROXY_FULL_ADDRESS:

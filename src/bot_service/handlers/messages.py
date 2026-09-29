@@ -10,9 +10,19 @@ logger = APP_CTX.get_logger()
 router = Router()
 
 
+def _is_similar_caption(caption: str | None) -> bool:
+    if not caption:
+        return False
+    head = caption.strip().split()[0].lower()
+    return head in ("/similar", "/similar@pic_vault_bot")
+
+
 @router.message(F.photo)
 async def save_photo(message: types.Message, bot: Bot):
     if message.from_user is None:
+        return
+    # /similar handled in commands_router (registered first)
+    if _is_similar_caption(message.caption):
         return
 
     photo = message.photo[-1]

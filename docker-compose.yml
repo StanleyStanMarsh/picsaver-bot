@@ -126,6 +126,8 @@ services:
       QDRANT_COLLECTION: user_images
       CLIP_VECTOR_SIZE: "1024"
       WEBAPP_URL: ${WEBAPP_URL:-}
+      SEARCH_MIN_SCORE: ${SEARCH_MIN_SCORE:-0.25}
+      SIMILAR_MIN_SCORE: ${SIMILAR_MIN_SCORE:-0.35}
     env_file:
       - .env
     volumes:

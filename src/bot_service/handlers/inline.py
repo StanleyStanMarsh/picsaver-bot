@@ -20,10 +20,11 @@ async def inline_query(query: types.InlineQuery):
         await query.answer([], cache_time=1, is_personal=True)
         return
 
+    text = (query.query or "").strip()
     try:
         images = await search_user_images_by_text(
             user_id=user.id,
-            query=query.query or "",
+            query=text,
             limit=MAX_RESULTS,
         )
     except Exception:
@@ -51,7 +52,11 @@ async def inline_query(query: types.InlineQuery):
         "is_personal": True,
     }
     if not results:
-        kwargs["switch_pm_text"] = "Сохрани фото в боте"
-        kwargs["switch_pm_parameter"] = "start"
+        if text:
+            kwargs["switch_pm_text"] = "Ничего не нашлось"
+            kwargs["switch_pm_parameter"] = "start"
+        else:
+            kwargs["switch_pm_text"] = "Сохрани фото в боте"
+            kwargs["switch_pm_parameter"] = "start"
 
     await query.answer(results, **kwargs)

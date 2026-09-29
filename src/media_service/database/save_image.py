@@ -145,3 +145,27 @@ def embed_text_job(text: str) -> list[float]:
     from media_service.clip import embed_text
 
     return embed_text(text)
+
+
+def embed_image_job(file_path: str) -> list[float]:
+    """RQ job: download Telegram file to temp, CLIP image embed, delete temp."""
+    import tempfile
+    from media_service.clip import embed_image_path
+
+    proxy = PROXY_FULL_ADDRESS if PROXY_FULL_ADDRESS and "None" not in PROXY_FULL_ADDRESS else None
+    suffix = Path(file_path).suffix or ".jpg"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        tmp_path = tmp.name
+    try:
+        download_image_by_file_path(
+            bot_token=BOT_TOKEN,
+            file_path=file_path,
+            save_path=tmp_path,
+            proxy=proxy,
+        )
+        return embed_image_path(tmp_path)
+    finally:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
