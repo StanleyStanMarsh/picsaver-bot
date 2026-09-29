@@ -90,6 +90,12 @@ services:
       KMP_DUPLICATE_LIB_OK: "TRUE"
       CLIP_WARMUP: "1"
       HF_HOME: /workspace/.cache/huggingface
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_BUCKET: ${MINIO_BUCKET:-picsaver}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-picsaver}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-change_me_minio_password}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
     env_file:
       - .env
     volumes:
@@ -100,6 +106,8 @@ services:
       - postgres
       - qdrant
       - migrate
+      - minio
+      - minio-init
     networks:
       - bot-network
 
@@ -128,6 +136,12 @@ services:
       WEBAPP_URL: ${WEBAPP_URL:-}
       SEARCH_MIN_SCORE: ${SEARCH_MIN_SCORE:-0.25}
       SIMILAR_MIN_SCORE: ${SIMILAR_MIN_SCORE:-0.35}
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_BUCKET: ${MINIO_BUCKET:-picsaver}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-picsaver}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-change_me_minio_password}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
     env_file:
       - .env
     volumes:
@@ -139,6 +153,8 @@ services:
       - qdrant
       - migrate
       - webapp
+      - minio
+      - minio-init
     networks:
       - bot-network
 
@@ -160,6 +176,12 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       QDRANT_URL: http://qdrant:6333
       QDRANT_COLLECTION: user_images
+      STORAGE_BACKEND: ${STORAGE_BACKEND:-local}
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-http://minio:9000}
+      MINIO_BUCKET: ${MINIO_BUCKET:-picsaver}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-picsaver}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-change_me_minio_password}
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
     env_file:
       - .env
     volumes:
@@ -168,6 +190,8 @@ services:
       - postgres
       - qdrant
       - migrate
+      - minio
+      - minio-init
     networks:
       - bot-network
     # DevOps: nginx TLS terminates here, e.g. proxy_pass http://webapp:8080;
@@ -175,12 +199,61 @@ services:
     # ports:
     #   - "8080:8080"
 
+  # Object storage (S3-compatible). Internal only — no public ports.
+  # Dual-mode: STORAGE_BACKEND=local|minio (app code on this branch).
+  minio:
+    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
+    container_name: bot-minio
+    restart: unless-stopped
+    mem_limit: 512m
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-picsaver}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change_me_minio_password}
+    volumes:
+      - minio-data:/data
+    networks:
+      - bot-network
+    # Debug console (do not publish on public VPS):
+    # ports:
+    #   - "127.0.0.1:9000:9000"
+    #   - "127.0.0.1:9001:9001"
+
+  minio-init:
+    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
+    container_name: bot-minio-init
+    restart: "no"
+    depends_on:
+      - minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-picsaver}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change_me_minio_password}
+      MINIO_BUCKET: ${MINIO_BUCKET:-picsaver}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -e
+        i=0
+        until mc alias set local http://minio:9000 "$$MINIO_ROOT_USER" "$$MINIO_ROOT_PASSWORD"; do
+          i=$$((i+1))
+          if [ "$$i" -ge 30 ]; then echo "minio not ready"; exit 1; fi
+          sleep 1
+        done
+        mc mb -p "local/$$MINIO_BUCKET" || true
+        mc anonymous set none "local/$$MINIO_BUCKET" || true
+        echo "bucket ready: $$MINIO_BUCKET"
+    networks:
+      - bot-network
+
+
 volumes:
   redis-data:
   images-data:
   pg-data:
   qdrant-data:
   hf-cache:
+  minio-data:
 
 networks:
   bot-network:
