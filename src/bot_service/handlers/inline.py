@@ -3,6 +3,10 @@ import uuid
 from aiogram import Router, types
 from aiogram.types import InlineQueryResultCachedPhoto
 
+from bot_service.services.save_limits import (
+    SaveQuotaExceeded,
+    SaveQueueBusy,
+)
 from media_service.tools.images import search_user_images_by_text
 from utils import APP_CTX
 
@@ -27,6 +31,20 @@ async def inline_query(query: types.InlineQuery):
             query=text,
             limit=MAX_RESULTS,
         )
+    except (SaveQueueBusy, SaveQuotaExceeded) as exc:
+        logger.warning(
+            "inline search limited user_id=%s err=%s",
+            user.id,
+            type(exc).__name__,
+        )
+        await query.answer(
+            [],
+            cache_time=1,
+            is_personal=True,
+            switch_pm_text="Бот загружен, попробуй позже",
+            switch_pm_parameter="start",
+        )
+        return
     except Exception:
         logger.exception("inline search failed user_id=%s query=%r", user.id, query.query)
         await query.answer(

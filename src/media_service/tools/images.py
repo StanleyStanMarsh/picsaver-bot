@@ -9,6 +9,12 @@ setup_logger()
 
 from utils import APP_CTX
 
+from bot_service.services.save_limits import (
+    SaveQuotaExceeded,
+    check_queue_depth_or_raise,
+    release_active_slot,
+    try_acquire_active_slot,
+)
 from media_service.database.get_image import get_images
 from media_service.qdrant_store import search_user_images
 from redis_queue import save_queue
@@ -46,11 +52,48 @@ async def wait_for_job(job, timeout=30, interval=0.2):
         await asyncio.sleep(interval)
 
 
+def _acquire_clip_slot(user_id: int) -> None:
+    """L5 depth then L3 per-user slot; raise typed errors (no enqueue yet)."""
+    depth = check_queue_depth_or_raise()
+    logger.info("save queue depth=%s user_id=%s", depth, user_id)
+    if not try_acquire_active_slot(user_id):
+        raise SaveQuotaExceeded(
+            f"user_id={user_id} active CLIP/save slots at limit"
+        )
+
+
+async def _enqueue_and_wait(
+    *,
+    user_id: int,
+    job_path: str,
+    kwargs: dict,
+    job_timeout: int,
+    result_ttl: int,
+    failure_ttl: int,
+    log_label: str,
+):
+    """Enqueue onto save/CLIP queue with L5 depth + L3 active-slot guards."""
+    await asyncio.to_thread(_acquire_clip_slot, user_id)
+    try:
+        job = save_queue.enqueue(
+            job_path,
+            kwargs=kwargs,
+            job_timeout=job_timeout,
+            result_ttl=result_ttl,
+            failure_ttl=failure_ttl,
+        )
+        logger.info("%s enqueued job.id=%s user_id=%s", log_label, job.id, user_id)
+        return await wait_for_job(job, timeout=job_timeout)
+    finally:
+        await asyncio.to_thread(release_active_slot, user_id)
+
+
 async def save_image(bot: Bot, user_id: int, file_id: str):
     file = await bot.get_file(file_id)
     logger.info(f"Processing file {file.file_path} for user={user_id}")
-    job = save_queue.enqueue(
-        SAVE_JOB,
+    return await _enqueue_and_wait(
+        user_id=user_id,
+        job_path=SAVE_JOB,
         kwargs={
             "user_id": user_id,
             "file_path": file.file_path,
@@ -59,9 +102,8 @@ async def save_image(bot: Bot, user_id: int, file_id: str):
         job_timeout=SAVE_JOB_TIMEOUT,
         result_ttl=600,
         failure_ttl=86400,
+        log_label="Saving image job",
     )
-    logger.info(f"Saving image job enqueued job.id={job.id}")
-    return await wait_for_job(job, timeout=SAVE_JOB_TIMEOUT)
 
 
 async def get_user_images(user_id: int):
@@ -76,14 +118,15 @@ async def search_user_images_by_text(user_id: int, query: str, limit: int = 20) 
         images = await get_images(user_id, limit=limit)
         return [{"file_id": img["file_id"], "score": None} for img in images]
 
-    job = save_queue.enqueue(
-        EMBED_TEXT_JOB,
+    vector = await _enqueue_and_wait(
+        user_id=user_id,
+        job_path=EMBED_TEXT_JOB,
         kwargs={"text": text},
         job_timeout=EMBED_JOB_TIMEOUT,
         result_ttl=120,
         failure_ttl=600,
+        log_label="Embed text job",
     )
-    vector = await wait_for_job(job, timeout=EMBED_JOB_TIMEOUT)
     return await asyncio.to_thread(
         search_user_images,
         vector=vector,
@@ -101,14 +144,15 @@ async def search_user_images_by_photo(
 ) -> list[dict]:
     """Embed query photo on CLIP worker, search own images; exclude source file_id."""
     file = await bot.get_file(file_id)
-    job = save_queue.enqueue(
-        EMBED_IMAGE_JOB,
+    vector = await _enqueue_and_wait(
+        user_id=user_id,
+        job_path=EMBED_IMAGE_JOB,
         kwargs={"file_path": file.file_path},
         job_timeout=EMBED_JOB_TIMEOUT,
         result_ttl=120,
         failure_ttl=600,
+        log_label="Embed image job",
     )
-    vector = await wait_for_job(job, timeout=EMBED_JOB_TIMEOUT)
     return await asyncio.to_thread(
         search_user_images,
         vector=vector,
@@ -117,3 +161,4 @@ async def search_user_images_by_photo(
         min_score=SIMILAR_MIN_SCORE,
         exclude_file_ids={file_id},
     )
+

@@ -4,6 +4,12 @@ from aiogram.filters import Command, CommandObject, CommandStart
 from aiogram.types import Message
 
 from bot_service.services import UsersService
+from bot_service.services.save_limits import (
+    MSG_BUSY,
+    MSG_QUOTA,
+    SaveQuotaExceeded,
+    SaveQueueBusy,
+)
 from media_service.tools.images import (
     search_user_images_by_photo,
     search_user_images_by_text,
@@ -50,6 +56,14 @@ async def cmd_search(message: Message, command: CommandObject):
     status = await message.answer("🔍 Ищу…")
     try:
         hits = await search_user_images_by_text(user_id=user.id, query=query, limit=5)
+    except SaveQueueBusy:
+        logger.warning("/search busy user_id=%s", user.id)
+        await status.edit_text(MSG_BUSY)
+        return
+    except SaveQuotaExceeded:
+        logger.warning("/search quota user_id=%s", user.id)
+        await status.edit_text(MSG_QUOTA)
+        return
     except Exception:
         logger.exception("/search failed user_id=%s query=%r", user.id, query)
         await status.edit_text("❌ Не удалось выполнить поиск. Попробуй ещё раз.")
@@ -97,6 +111,14 @@ async def _run_similar(message: Message, file_id: str) -> None:
             file_id=file_id,
             limit=3,
         )
+    except SaveQueueBusy:
+        logger.warning("/similar busy user_id=%s", user.id)
+        await status.edit_text(MSG_BUSY)
+        return
+    except SaveQuotaExceeded:
+        logger.warning("/similar quota user_id=%s", user.id)
+        await status.edit_text(MSG_QUOTA)
+        return
     except Exception:
         logger.exception("/similar failed user_id=%s", user.id)
         await status.edit_text("❌ Не удалось найти похожие. Попробуй ещё раз.")
