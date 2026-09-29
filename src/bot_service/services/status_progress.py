@@ -4,7 +4,7 @@ Flood control (DevOps):
 - Always edit the SAME status message (editMessageText on one message_id).
 - Throttle: edits apply on phase / k-of-n changes OR at most once per
   MIN_EDIT_INTERVAL_SEC (~1.2s). Pass force=True for finals / important jumps.
-- CLIP encode: UI shows one «Индексация (CLIP)» phase for the whole forward
+- CLIP encode: UI shows one «Индексация» phase for the whole forward
   pass — do not tick mid-encode (worker sets phase once at encode start).
 - Telegram "message is not modified" errors are ignored.
 """
@@ -30,7 +30,7 @@ PHASES: dict[str, tuple[str, float]] = {
     "download": ("Скачивание / подготовка", 0.15),
     "queue": ("В очереди", 0.30),
     "storage": ("Сохранение в хранилище", 0.40),
-    "clip": ("Индексация (CLIP)", 0.70),
+    "clip": ("Индексация", 0.70),
     "qdrant": ("Добавление в индекс", 0.90),
     "done": ("Готово", 1.0),
 }
