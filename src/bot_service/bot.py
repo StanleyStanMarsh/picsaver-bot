@@ -5,7 +5,7 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram import Bot, Dispatcher
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
-from aiogram.types import MenuButtonWebApp, WebAppInfo
+from aiogram.types import BotCommand, MenuButtonWebApp, WebAppInfo
 
 from bot_service.config import BOT_TOKEN, PROXY_FULL_ADDRESS
 from bot_service.handlers import commands_router, inline_router, messages_router
@@ -15,6 +15,19 @@ from db.session import dispose_engine, init_engine
 
 
 logger = APP_CTX.get_logger()
+
+
+
+async def _configure_bot_commands(bot: Bot) -> None:
+    """Slash-command hints in private chats (Telegram command menu)."""
+    await bot.set_my_commands(
+        [
+            BotCommand(command="start", description="О боте и как пользоваться"),
+            BotCommand(command="search", description="Найти свои фото по тексту"),
+            BotCommand(command="similar", description="Найти похожие на фото"),
+        ]
+    )
+    logger.info("Bot commands registered: /start /search /similar")
 
 
 async def _configure_menu_button(bot: Bot) -> None:
@@ -41,6 +54,7 @@ async def main():
     dp = Dispatcher()
 
     await init_engine()
+    await _configure_bot_commands(bot)
     await _configure_menu_button(bot)
 
     dp.include_router(commands_router)
