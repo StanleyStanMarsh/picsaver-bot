@@ -26,6 +26,33 @@ def _parse_endpoint(raw: str) -> tuple[str, bool]:
     return netloc, secure
 
 
+
+# Placeholders from .env.example / stock MinIO — refuse rather than run insecure.
+_WEAK_MINIO_SECRETS = frozenset(
+    {
+        "",
+        "change_me",
+        "change_me_minio_password",
+        "minioadmin",
+        "password",
+        "secret",
+        "minio123",
+    }
+)
+
+
+def _reject_weak_minio_credentials(access: str, secret: str) -> None:
+    if not access:
+        raise RuntimeError(
+            "MINIO_ACCESS_KEY is empty; set a real access key (see .env.example)"
+        )
+    if secret in _WEAK_MINIO_SECRETS or secret.lower() in _WEAK_MINIO_SECRETS:
+        raise RuntimeError(
+            "MINIO_SECRET_KEY is empty or a known placeholder; "
+            "set a strong secret before using STORAGE_BACKEND=minio|dual"
+        )
+
+
 class MinioStorage:
     """S3-compatible object storage via MinIO Python SDK."""
 
@@ -38,8 +65,9 @@ class MinioStorage:
         else:
             secure = secure_from_url
 
-        access = os.getenv("MINIO_ACCESS_KEY", "picsaver")
-        secret = os.getenv("MINIO_SECRET_KEY", "change_me_minio_password")
+        access = (os.getenv("MINIO_ACCESS_KEY") or "").strip()
+        secret = (os.getenv("MINIO_SECRET_KEY") or "").strip()
+        _reject_weak_minio_credentials(access, secret)
         region = os.getenv("MINIO_REGION", "us-east-1") or None
 
         self.bucket = os.getenv("MINIO_BUCKET", "picsaver")
