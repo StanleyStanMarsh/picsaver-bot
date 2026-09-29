@@ -9,6 +9,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
+from rq import get_current_job
 from sqlalchemy import text
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
@@ -22,6 +23,15 @@ FILE_STATUS_STORED = 2  # seed order: uploaded=1, stored=2, ...
 INDEX_STATUS_INDEXING = 2
 INDEX_STATUS_READY = 3
 INDEX_STATUS_ERROR = 4
+
+
+def _set_job_phase(phase: str) -> None:
+    """Publish coarse phase for bot status UI. No mid-CLIP ticks."""
+    job = get_current_job()
+    if job is None:
+        return
+    job.meta["phase"] = phase
+    job.save_meta()
 
 
 def _embedding_model_id(session) -> int | None:
@@ -66,6 +76,9 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
     Persist photo for user and index it for semantic search.
     Downloads to a tempfile, stores via STORAGE_BACKEND, embeds from temp.
     Returns {"image_id": str, "file_id": str}.
+
+    Publishes job.meta['phase'] at coarse steps only (download / storage /
+    clip / qdrant). CLIP phase is set once at encode START — never mid-forward.
     """
     image_id = uuid.uuid4()
     file_name = f"{image_id}.jpg"
@@ -75,6 +88,7 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
 
     tmp_path: str | None = None
     try:
+        _set_job_phase("download")
         with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
             tmp_path = tmp.name
         try:
@@ -90,6 +104,7 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
         digest = _content_hash(Path(tmp_path))
         now = datetime.now(tz=timezone.utc)
 
+        _set_job_phase("storage")
         storage = get_storage()
         storage.put_file(relative_path, tmp_path)
 
@@ -117,7 +132,11 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
         try:
             from media_service.clip import embed_image_path
 
+            # One phase at encode START; bar may sit here for tens of seconds (CPU).
+            _set_job_phase("clip")
             vector = embed_image_path(tmp_path)
+
+            _set_job_phase("qdrant")
             upsert_image_vector(
                 image_id=image_id,
                 vector=vector,
@@ -143,6 +162,7 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
                     session.commit()
             raise
 
+        _set_job_phase("done")
         return {"image_id": str(image_id), "file_id": file_id}
     finally:
         if tmp_path:

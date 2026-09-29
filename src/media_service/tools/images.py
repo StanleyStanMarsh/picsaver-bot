@@ -1,5 +1,7 @@
 import asyncio
 import os
+from collections.abc import Callable
+from typing import Any
 
 from aiogram import Bot
 
@@ -32,13 +34,30 @@ SAVE_JOB = "media_service.database.save_image.add_image"
 EMBED_TEXT_JOB = "media_service.database.save_image.embed_text_job"
 EMBED_IMAGE_JOB = "media_service.database.save_image.embed_image_job"
 
+ProgressCallback = Callable[[str], Any]
 
-async def wait_for_job(job, timeout=30, interval=0.2):
+
+async def wait_for_job(
+    job,
+    timeout=30,
+    interval=0.2,
+    on_tick: Callable[[Any], Any] | None = None,
+):
+    """Poll RQ job until finished/failed/timeout.
+
+    ``on_tick`` is invoked after each refresh (e.g. to read job.meta['phase']).
+    Callers must throttle Telegram edits themselves — do not spam on every tick.
+    """
     loop = asyncio.get_running_loop()
     start = loop.time()
 
     while True:
         await asyncio.to_thread(job.refresh)
+
+        if on_tick is not None:
+            maybe = on_tick(job)
+            if maybe is not None and asyncio.iscoroutine(maybe):
+                await maybe
 
         if job.is_finished:
             return job.result
@@ -71,6 +90,7 @@ async def _enqueue_and_wait(
     result_ttl: int,
     failure_ttl: int,
     log_label: str,
+    on_tick: Callable[[Any], Any] | None = None,
 ):
     """Enqueue onto save/CLIP queue with L5 depth + L3 active-slot guards."""
     await asyncio.to_thread(_acquire_clip_slot, user_id)
@@ -83,14 +103,46 @@ async def _enqueue_and_wait(
             failure_ttl=failure_ttl,
         )
         logger.info("%s enqueued job.id=%s user_id=%s", log_label, job.id, user_id)
-        return await wait_for_job(job, timeout=job_timeout)
+        return await wait_for_job(job, timeout=job_timeout, on_tick=on_tick)
     finally:
         await asyncio.to_thread(release_active_slot, user_id)
 
 
-async def save_image(bot: Bot, user_id: int, file_id: str):
+async def save_image(
+    bot: Bot,
+    user_id: int,
+    file_id: str,
+    on_progress: ProgressCallback | None = None,
+):
+    """Download file meta from TG, enqueue worker job, wait for result.
+
+    ``on_progress(phase)`` is called with coarse phase keys:
+    download → queue → (worker meta: storage / clip / qdrant / done).
+    CLIP stays on ``clip`` for the whole encode; no mid-forward ticks.
+    """
+
+    async def _emit(phase: str) -> None:
+        if on_progress is None:
+            return
+        maybe = on_progress(phase)
+        if maybe is not None and asyncio.iscoroutine(maybe):
+            await maybe
+
+    await _emit("download")
     file = await bot.get_file(file_id)
     logger.info(f"Processing file {file.file_path} for user={user_id}")
+
+    await _emit("queue")
+
+    last_phase: dict[str, str | None] = {"value": None}
+
+    async def _on_tick(job) -> None:
+        phase = (job.meta or {}).get("phase")
+        if not phase or phase == last_phase["value"]:
+            return
+        last_phase["value"] = phase
+        await _emit(phase)
+
     return await _enqueue_and_wait(
         user_id=user_id,
         job_path=SAVE_JOB,
@@ -103,6 +155,7 @@ async def save_image(bot: Bot, user_id: int, file_id: str):
         result_ttl=600,
         failure_ttl=86400,
         log_label="Saving image job",
+        on_tick=_on_tick,
     )
 
 
@@ -161,4 +214,3 @@ async def search_user_images_by_photo(
         min_score=SIMILAR_MIN_SCORE,
         exclude_file_ids={file_id},
     )
-
