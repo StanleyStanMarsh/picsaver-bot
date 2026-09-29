@@ -43,7 +43,6 @@ async def inline_query(query: types.InlineQuery):
             InlineQueryResultCachedPhoto(
                 id=str(image.get("image_id") or uuid.uuid4()),
                 photo_file_id=image["file_id"],
-                caption="📸 Picsaver",
             )
         )
 
