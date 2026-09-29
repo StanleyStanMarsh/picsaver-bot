@@ -1,4 +1,4 @@
-"""Delete user image from Postgres, disk, and Qdrant."""
+"""Delete user image from Postgres, storage, and Qdrant."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -11,6 +11,7 @@ from db.models import Image
 from db.sync_session import get_sync_sessionmaker
 from media_service.paths import IMAGES_DIR
 from media_service.qdrant_store import delete_image_vector
+from media_service.storage import get_storage
 
 
 class ImageNotFoundError(LookupError):
@@ -19,7 +20,7 @@ class ImageNotFoundError(LookupError):
 
 def delete_user_image(*, user_id: int, image_id: UUID) -> dict:
     """
-    Remove from search (Qdrant), soft-delete in Postgres, unlink local file.
+    Remove from search (Qdrant), soft-delete in Postgres, delete from storage.
     Ownership is enforced by user_id.
     """
     Session = get_sync_sessionmaker()
@@ -42,11 +43,9 @@ def delete_user_image(*, user_id: int, image_id: UUID) -> dict:
             img.updated_at = now
             session.commit()
 
-    file_path = IMAGES_DIR / relative_path
     try:
-        if file_path.is_file():
-            file_path.unlink()
-    except OSError:
+        get_storage().delete(relative_path)
+    except Exception:
         pass
 
     return {"image_id": str(image_id), "deleted": True}
@@ -73,6 +72,10 @@ def list_user_images(*, user_id: int, limit: int = 200) -> list[dict]:
 
 
 def resolve_user_image_path(*, user_id: int, image_id: UUID) -> Path:
+    """
+    Resolve local disk path when the object lives under IMAGES_DIR.
+    Prefer resolve_user_image_bytes for storage-agnostic serving.
+    """
     Session = get_sync_sessionmaker()
     with Session() as session:
         img = session.get(Image, image_id)
@@ -82,3 +85,20 @@ def resolve_user_image_path(*, user_id: int, image_id: UUID) -> Path:
         if not path.is_file():
             raise ImageNotFoundError(str(image_id))
         return path
+
+
+def resolve_user_image_bytes(*, user_id: int, image_id: UUID) -> bytes:
+    """Fetch image bytes via STORAGE_BACKEND (MinIO and/or local)."""
+    Session = get_sync_sessionmaker()
+    with Session() as session:
+        img = session.get(Image, image_id)
+        if img is None or img.user_id != user_id or img.deleted_at is not None:
+            raise ImageNotFoundError(str(image_id))
+        key = img.path
+
+    try:
+        return get_storage().open_bytes(key)
+    except FileNotFoundError as e:
+        raise ImageNotFoundError(str(image_id)) from e
+    except Exception as e:
+        raise ImageNotFoundError(str(image_id)) from e

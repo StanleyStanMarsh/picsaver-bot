@@ -13,7 +13,7 @@ from media_service.database.delete_image import (
     ImageNotFoundError,
     delete_user_image,
     list_user_images,
-    resolve_user_image_path,
+    resolve_user_image_bytes,
 )
 from webapp.admin_auth import (
     admin_password,
@@ -94,10 +94,14 @@ def api_list_images(user_id: int = Depends(current_user_id)):
 @app.get("/api/images/{image_id}/file")
 def api_image_file(image_id: UUID, user_id: int = Depends(current_user_id)):
     try:
-        path = resolve_user_image_path(user_id=user_id, image_id=image_id)
+        data = resolve_user_image_bytes(user_id=user_id, image_id=image_id)
     except ImageNotFoundError:
         raise HTTPException(status_code=404, detail="not found")
-    return FileResponse(path, media_type="image/jpeg", filename=f"{image_id}.jpg")
+    return Response(
+        content=data,
+        media_type="image/jpeg",
+        headers={"Content-Disposition": f'inline; filename="{image_id}.jpg"'},
+    )
 
 
 @app.delete("/api/images/{image_id}")
