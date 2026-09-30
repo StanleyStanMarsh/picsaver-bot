@@ -6,7 +6,7 @@ import os
 
 from redis_queue.queue import redis_conn, save_queue
 
-SAVE_ALBUM_MAX = int(os.getenv("SAVE_ALBUM_MAX", "5"))
+SAVE_ALBUM_MAX = int(os.getenv("SAVE_ALBUM_MAX", "6"))
 SAVE_RATE_LIMIT = int(os.getenv("SAVE_RATE_LIMIT", "20"))
 SAVE_RATE_WINDOW_SEC = int(os.getenv("SAVE_RATE_WINDOW_SEC", "600"))
 SAVE_USER_ACTIVE_MAX = int(os.getenv("SAVE_USER_ACTIVE_MAX", "3"))
