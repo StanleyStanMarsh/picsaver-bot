@@ -74,7 +74,7 @@ async def wait_for_job(
 def _acquire_clip_slot(user_id: int) -> None:
     """L5 depth then L3 per-user slot; raise typed errors (no enqueue yet)."""
     depth = check_queue_depth_or_raise()
-    logger.info("save queue depth=%s user_id=%s", depth, user_id)
+    logger.info("save queue depth={} user_id={}", depth, user_id)
     if not try_acquire_active_slot(user_id):
         raise SaveQuotaExceeded(
             f"user_id={user_id} active CLIP/save slots at limit"
@@ -102,7 +102,7 @@ async def _enqueue_and_wait(
             result_ttl=result_ttl,
             failure_ttl=failure_ttl,
         )
-        logger.info("%s enqueued job.id=%s user_id=%s", log_label, job.id, user_id)
+        logger.info("{} enqueued job.id={} user_id={}", log_label, job.id, user_id)
         return await wait_for_job(job, timeout=job_timeout, on_tick=on_tick)
     finally:
         await asyncio.to_thread(release_active_slot, user_id)

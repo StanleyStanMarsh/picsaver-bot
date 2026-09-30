@@ -108,7 +108,7 @@ async def _handle_single_photo(message: types.Message, bot: Bot, file_id: str) -
     try:
         status_msg = await message.reply(format_phase_status("download"))
     except Exception:
-        logger.exception("failed to send save status user_id=%s", user_id)
+        logger.exception("failed to send save status user_id={}", user_id)
         status_msg = None
 
     asyncio.create_task(save_and_notify(message, bot, file_id, status_msg))
@@ -167,7 +167,7 @@ async def _debounced_flush_album(media_group_id: str) -> None:
         try:
             await reply_to.reply(MSG_ALBUM_TOO_BIG)
         except Exception:
-            logger.exception("failed to notify album-too-big user_id=%s", user_id)
+            logger.exception("failed to notify album-too-big user_id={}", user_id)
         return
 
     allowed, _ = await asyncio.to_thread(try_consume_save_quota, user_id, n)
@@ -175,7 +175,7 @@ async def _debounced_flush_album(media_group_id: str) -> None:
         try:
             await reply_to.reply(MSG_RATE_LIMIT)
         except Exception:
-            logger.exception("failed to notify rate-limit user_id=%s", user_id)
+            logger.exception("failed to notify rate-limit user_id={}", user_id)
         return
 
     # Album saves are sequential (1 slot); still refuse if user already at active max.
@@ -184,13 +184,13 @@ async def _debounced_flush_album(media_group_id: str) -> None:
         try:
             await reply_to.reply(early)
         except Exception:
-            logger.exception("failed to notify clip-guard user_id=%s", user_id)
+            logger.exception("failed to notify clip-guard user_id={}", user_id)
         return
 
     try:
         status = await reply_to.reply(format_album_progress(0, n))
     except Exception:
-        logger.exception("failed to send album status user_id=%s", user_id)
+        logger.exception("failed to send album status user_id={}", user_id)
         status = None
 
     asyncio.create_task(
@@ -222,16 +222,16 @@ async def save_and_notify(
         )
         await _notify_or_edit(message, status, MSG_SAVE_OK)
     except SaveQueueBusy:
-        logger.warning("save busy user_id=%s", getattr(message.from_user, "id", None))
+        logger.warning("save busy user_id={}", getattr(message.from_user, "id", None))
         await _notify_or_edit(message, status, MSG_BUSY)
     except SaveQuotaExceeded:
-        logger.warning("save quota user_id=%s", getattr(message.from_user, "id", None))
+        logger.warning("save quota user_id={}", getattr(message.from_user, "id", None))
         await _notify_or_edit(message, status, MSG_QUOTA)
     except TimeoutError:
-        logger.exception("save timeout user_id=%s", getattr(message.from_user, "id", None))
+        logger.exception("save timeout user_id={}", getattr(message.from_user, "id", None))
         await _notify_or_edit(message, status, MSG_SAVE_TIMEOUT)
     except Exception:
-        logger.exception("save failed user_id=%s", getattr(message.from_user, "id", None))
+        logger.exception("save failed user_id={}", getattr(message.from_user, "id", None))
         await _notify_or_edit(message, status, MSG_SAVE_FAILED)
 
 
@@ -260,20 +260,20 @@ async def save_album_and_notify(
                 busy_hit = True
                 failed += 1
                 logger.warning(
-                    "album photo save busy user_id=%s file_id=%s", user_id, file_id
+                    "album photo save busy user_id={} file_id={}", user_id, file_id
                 )
                 break
             except SaveQuotaExceeded:
                 quota_hit = True
                 failed += 1
                 logger.warning(
-                    "album photo save quota user_id=%s file_id=%s", user_id, file_id
+                    "album photo save quota user_id={} file_id={}", user_id, file_id
                 )
                 break
             except Exception:
                 failed += 1
                 logger.exception(
-                    "album photo save failed user_id=%s file_id=%s", user_id, file_id
+                    "album photo save failed user_id={} file_id={}", user_id, file_id
                 )
 
         if busy_hit and ok == 0:
@@ -289,8 +289,8 @@ async def save_album_and_notify(
 
         await _notify_or_edit(reply_to, status, text)
     except TimeoutError:
-        logger.exception("album save timeout user_id=%s", user_id)
+        logger.exception("album save timeout user_id={}", user_id)
         await _notify_or_edit(reply_to, status, MSG_SAVE_TIMEOUT)
     except Exception:
-        logger.exception("album save failed user_id=%s", user_id)
+        logger.exception("album save failed user_id={}", user_id)
         await _notify_or_edit(reply_to, status, MSG_SAVE_FAILED)

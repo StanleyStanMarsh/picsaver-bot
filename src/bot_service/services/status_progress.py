@@ -101,7 +101,7 @@ class StatusEditor:
             if _is_not_modified(e):
                 self.last_text = text
                 return True
-            logger.warning("status edit failed: %s", e)
+            logger.warning("status edit failed: {}", e)
             return False
 
     async def set_phase(self, phase: str, *, force: bool = False) -> bool:

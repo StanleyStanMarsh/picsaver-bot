@@ -57,15 +57,15 @@ async def cmd_search(message: Message, command: CommandObject):
     try:
         hits = await search_user_images_by_text(user_id=user.id, query=query, limit=5)
     except SaveQueueBusy:
-        logger.warning("/search busy user_id=%s", user.id)
+        logger.warning("/search busy user_id={}", user.id)
         await status.edit_text(MSG_BUSY)
         return
     except SaveQuotaExceeded:
-        logger.warning("/search quota user_id=%s", user.id)
+        logger.warning("/search quota user_id={}", user.id)
         await status.edit_text(MSG_QUOTA)
         return
     except Exception:
-        logger.exception("/search failed user_id=%s query=%r", user.id, query)
+        logger.exception("/search failed user_id={} query={!r}", user.id, query)
         await status.edit_text("❌ Не удалось выполнить поиск. Попробуй ещё раз.")
         return
 
@@ -112,15 +112,15 @@ async def _run_similar(message: Message, file_id: str) -> None:
             limit=3,
         )
     except SaveQueueBusy:
-        logger.warning("/similar busy user_id=%s", user.id)
+        logger.warning("/similar busy user_id={}", user.id)
         await status.edit_text(MSG_BUSY)
         return
     except SaveQuotaExceeded:
-        logger.warning("/similar quota user_id=%s", user.id)
+        logger.warning("/similar quota user_id={}", user.id)
         await status.edit_text(MSG_QUOTA)
         return
     except Exception:
-        logger.exception("/similar failed user_id=%s", user.id)
+        logger.exception("/similar failed user_id={}", user.id)
         await status.edit_text("❌ Не удалось найти похожие. Попробуй ещё раз.")
         return
 

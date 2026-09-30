@@ -33,7 +33,7 @@ async def inline_query(query: types.InlineQuery):
         )
     except (SaveQueueBusy, SaveQuotaExceeded) as exc:
         logger.warning(
-            "inline search limited user_id=%s err=%s",
+            "inline search limited user_id={} err={}",
             user.id,
             type(exc).__name__,
         )
@@ -46,7 +46,7 @@ async def inline_query(query: types.InlineQuery):
         )
         return
     except Exception:
-        logger.exception("inline search failed user_id=%s query=%r", user.id, query.query)
+        logger.exception("inline search failed user_id={} query={!r}", user.id, query.query)
         await query.answer(
             [],
             cache_time=1,

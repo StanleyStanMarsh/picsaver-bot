@@ -39,7 +39,7 @@ async def _configure_menu_button(bot: Bot) -> None:
     await bot.set_chat_menu_button(
         menu_button=MenuButtonWebApp(text="Open", web_app=WebAppInfo(url=url))
     )
-    logger.info("Menu Button set to Open → %s", url)
+    logger.info("Menu Button set to Open → {}", url)
 
 
 async def main():

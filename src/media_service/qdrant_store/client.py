@@ -130,7 +130,7 @@ def search_user_images(
             continue
         if file_id in exclude_file_ids or image_id in exclude_image_ids:
             logger.info(
-                "search hit user_id=%s image_id=%s score=%s decision=drop reason=exclude cutoff=%s top_k=%s",
+                "search hit user_id={} image_id={} score={} decision=drop reason=exclude cutoff={} top_k={}",
                 user_id,
                 image_id,
                 score,
@@ -142,7 +142,7 @@ def search_user_images(
         below = min_score is not None and score is not None and score < min_score
         decision = "drop" if below else "kept"
         logger.info(
-            "search hit user_id=%s image_id=%s score=%s decision=%s cutoff=%s top_k=%s",
+            "search hit user_id={} image_id={} score={} decision={} cutoff={} top_k={}",
             user_id,
             image_id,
             score,
@@ -164,7 +164,7 @@ def search_user_images(
             break
 
     logger.info(
-        "search done user_id=%s kept=%s cutoff=%s top_k=%s",
+        "search done user_id={} kept={} cutoff={} top_k={}",
         user_id,
         len(out),
         min_score,

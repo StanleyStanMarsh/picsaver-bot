@@ -36,7 +36,7 @@ class DualStorage:
             self._minio.put_file(key, src_path)
             return
         except Exception as e:
-            logger.warning("dual put: MinIO failed for %s (%s); falling back to local", key, e)
+            logger.warning("dual put: MinIO failed for {} ({}); falling back to local", key, e)
             self._local.put_file(key, src_path)
 
     def download_to_path(self, key: str, dest: str | Path) -> None:
@@ -45,7 +45,7 @@ class DualStorage:
                 self._minio.download_to_path(key, dest)
                 return
         except Exception as e:
-            logger.warning("dual download: MinIO miss/error for %s (%s); trying local", key, e)
+            logger.warning("dual download: MinIO miss/error for {} ({}); trying local", key, e)
         self._local.download_to_path(key, dest)
 
     def delete(self, key: str) -> None:
@@ -71,7 +71,7 @@ class DualStorage:
             if self._minio.exists(key):
                 return self._minio.open_bytes(key)
         except Exception as e:
-            logger.warning("dual open_bytes: MinIO miss/error for %s (%s); trying local", key, e)
+            logger.warning("dual open_bytes: MinIO miss/error for {} ({}); trying local", key, e)
         return self._local.open_bytes(key)
 
 
@@ -98,7 +98,7 @@ def get_storage() -> StorageBackend:
     else:
         # local (default) and any unknown value → local for safety
         if backend not in ("local", "", "disk"):
-            logger.warning("unknown STORAGE_BACKEND=%r; using local", backend)
+            logger.warning("unknown STORAGE_BACKEND={!r}; using local", backend)
         _storage = LocalStorage()
     return _storage
 
