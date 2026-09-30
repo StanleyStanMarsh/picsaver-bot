@@ -1,7 +1,7 @@
 # Picsaver — спецификация
 
 Краткое описание устройства проекта: продукт, стек, потоки данных, ограничения и деплой.  
-Актуальная ветка стенда: **`feat/minio`** (поверх `dev/db`). Документ обновлён на момент `d59596d`.
+Актуальная ветка стенда: **`feat/minio`** (поверх `dev/db`). Документ обновлён на момент `927ab45`.
 
 ---
 
@@ -135,7 +135,7 @@ Postgres / Redis / Qdrant / MinIO **не** публиковать наружу.
 
 | Env | Default | Смысл |
 |---|---|---|
-| `SAVE_ALBUM_MAX` | 5 | Макс. фото из одного `media_group` в очередь; один статус на альбом |
+| `SAVE_ALBUM_MAX` | 6 | Макс. фото из одного `media_group` в очередь; один статус на альбом |
 | `SAVE_RATE_LIMIT` / `SAVE_RATE_WINDOW_SEC` | 20 / 600 | Rate save на user; сверх — без enqueue |
 | `SAVE_JOB_TIMEOUT` | 600 | Таймаут ожидания джобы |
 | `SAVE_USER_ACTIVE_MAX` | 3 | Макс. активных CLIP-джоб на user (save + embed search/similar) |
@@ -172,7 +172,7 @@ Postgres / Redis / Qdrant / MinIO **не** публиковать наружу.
 
 ## 10. Критерии приёмки (сжато)
 
-- Save: одно status-сообщение с bar; альбом ≤5 + `k/n`; лимиты A/B с явными отказами.
+- Save: одно status-сообщение с bar; альбом ≤6 + `k/n`; лимиты A/B с явными отказами.
 - Поиск: inline / `/search` / `/similar` + cutoff; пустой inline без encode; чужие не видны.
 - Mini App Open + delete из storage; `/start` + меню команд.
 - Admin: форма + агрегаты; без утечки секретов.
