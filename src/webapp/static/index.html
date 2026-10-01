@@ -9,11 +9,22 @@
 </head>
 <body>
   <header class="bar">
-    <h1>Мои фото</h1>
+    <div class="title-row">
+      <h1>Мои фото</h1>
+      <span class="beta-badge" title="Бета-версия">β</span>
+    </div>
     <button id="btn-delete" class="danger" disabled>Удалить</button>
   </header>
   <p id="status" class="status">Загрузка…</p>
   <div id="grid" class="grid"></div>
+  <footer class="footer">
+    <a
+      class="feedback-link"
+      href="https://forms.yandex.ru/u/6abe6a7df47e73767e0498df"
+      target="_blank"
+      rel="noopener noreferrer"
+    >Сообщить об ошибке или предложить улучшения</a>
+  </footer>
   <script src="/static/app.js"></script>
 </body>
 </html>

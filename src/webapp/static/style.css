@@ -80,3 +80,31 @@ body {
   display: none;
 }
 .card.selected .check { display: block; }
+
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.beta-badge {
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--btn) 22%, transparent);
+  color: var(--btn);
+  border: 1px solid color-mix(in srgb, var(--btn) 45%, transparent);
+}
+.footer {
+  padding: 12px 16px 28px;
+  text-align: center;
+}
+.feedback-link {
+  color: var(--btn);
+  font-size: 0.85rem;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
