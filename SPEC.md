@@ -1,7 +1,7 @@
 # Picsaver — спецификация
 
 Краткое описание устройства проекта: продукт, стек, потоки данных, ограничения и деплой.  
-Актуальная ветка стенда: **`feat/minio`** (поверх `dev/db`). Документ обновлён на момент `927ab45`.
+Актуальная ветка стенда: **`feat/minio`** (поверх `dev/db`). Документ обновлён на момент `57d0908`.
 
 ---
 
@@ -76,7 +76,7 @@ docker-compose.yml
 | Канал | Поведение |
 |---|---|
 | Inline пустой | Список своих из Postgres (без encode) |
-| Inline с текстом | `embed_text` → Qdrant, cap 50, `SEARCH_MIN_SCORE` (default **0.25**) |
+| Inline с текстом | `embed_text` → Qdrant, cap 50, `SEARCH_MIN_SCORE` (default **0.2**) |
 | `/search <текст>` | То же в ЛС, top-**5** + тот же cutoff |
 | `/similar` + фото | `get_image_features` → top-**3** своих **без** исходника, `SIMILAR_MIN_SCORE` (default **0.35**) |
 
@@ -140,7 +140,7 @@ Postgres / Redis / Qdrant / MinIO **не** публиковать наружу.
 | `SAVE_JOB_TIMEOUT` | 600 | Таймаут ожидания джобы |
 | `SAVE_USER_ACTIVE_MAX` | 3 | Макс. активных CLIP-джоб на user (save + embed search/similar) |
 | `SAVE_QUEUE_MAX_DEPTH` | 50 | Soft-reject при переполнении очереди `save` |
-| `SEARCH_MIN_SCORE` | 0.25 | Cutoff текстового поиска |
+| `SEARCH_MIN_SCORE` | 0.2 | Cutoff текстового поиска (inline и `/search`) |
 | `SIMILAR_MIN_SCORE` | 0.35 | Cutoff `/similar` |
 
 ---
