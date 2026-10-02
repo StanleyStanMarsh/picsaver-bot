@@ -26,7 +26,7 @@ logger = APP_CTX.get_logger()
 SAVE_JOB_TIMEOUT = int(os.getenv("SAVE_JOB_TIMEOUT", "600"))  # CLIP on CPU can be slow
 EMBED_JOB_TIMEOUT = int(os.getenv("EMBED_JOB_TIMEOUT", "120"))
 
-SEARCH_MIN_SCORE = float(os.getenv("SEARCH_MIN_SCORE", "0.25"))
+SEARCH_MIN_SCORE = float(os.getenv("SEARCH_MIN_SCORE", "0.2"))
 SIMILAR_MIN_SCORE = float(os.getenv("SIMILAR_MIN_SCORE", "0.35"))
 
 # String paths so RQ imports reliably inside the worker process
