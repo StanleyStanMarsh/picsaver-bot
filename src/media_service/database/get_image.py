@@ -27,6 +27,7 @@ async def get_images(user_id: int, limit: int = 50):
                 "file_id": row.telegram_file_id,
                 "image_id": str(row.image_id),
                 "local_path": row.path,
+                "media_type": row.media_type or "photo",
             }
             for row in rows
         ]

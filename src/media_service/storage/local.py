@@ -10,7 +10,7 @@ from media_service.paths import IMAGES_DIR
 class LocalStorage:
     """Object-key API backed by files under IMAGES_DIR/{key}."""
 
-    def put_file(self, key: str, src_path: str | Path) -> None:
+    def put_file(self, key: str, src_path: str | Path, content_type: str = "image/jpeg") -> None:
         dest = IMAGES_DIR / key
         dest.parent.mkdir(parents=True, exist_ok=True)
         src = Path(src_path)

@@ -66,6 +66,7 @@ def list_user_images(*, user_id: int, limit: int = 200) -> list[dict]:
                 "image_id": str(row.image_id),
                 "created_at": row.created_at.isoformat() if row.created_at else None,
                 "path": row.path,
+                "media_type": row.media_type or "photo",
             }
             for row in rows
         ]
@@ -85,6 +86,21 @@ def resolve_user_image_path(*, user_id: int, image_id: UUID) -> Path:
         if not path.is_file():
             raise ImageNotFoundError(str(image_id))
         return path
+
+
+def resolve_user_image_media(*, user_id: int, image_id: UUID) -> tuple[bytes, str]:
+    """Bytes + media_type ('photo'|'gif') for the Mini App file endpoint."""
+    Session = get_sync_sessionmaker()
+    with Session() as session:
+        img = session.get(Image, image_id)
+        if img is None or img.user_id != user_id or img.deleted_at is not None:
+            raise ImageNotFoundError(str(image_id))
+        key = img.path
+        media_type = img.media_type or "photo"
+    try:
+        return get_storage().open_bytes(key), media_type
+    except Exception as e:
+        raise ImageNotFoundError(str(image_id)) from e
 
 
 def resolve_user_image_bytes(*, user_id: int, image_id: UUID) -> bytes:

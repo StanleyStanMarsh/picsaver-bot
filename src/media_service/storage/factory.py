@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 @runtime_checkable
 class StorageBackend(Protocol):
-    def put_file(self, key: str, src_path: str | Path) -> None: ...
+    def put_file(self, key: str, src_path: str | Path, content_type: str = "image/jpeg") -> None: ...
     def download_to_path(self, key: str, dest: str | Path) -> None: ...
     def delete(self, key: str) -> None: ...
     def exists(self, key: str) -> bool: ...
@@ -31,13 +31,13 @@ class DualStorage:
         self._minio = primary
         self._local = fallback
 
-    def put_file(self, key: str, src_path: str | Path) -> None:
+    def put_file(self, key: str, src_path: str | Path, content_type: str = "image/jpeg") -> None:
         try:
-            self._minio.put_file(key, src_path)
+            self._minio.put_file(key, src_path, content_type=content_type)
             return
         except Exception as e:
             logger.warning("dual put: MinIO failed for {} ({}); falling back to local", key, e)
-            self._local.put_file(key, src_path)
+            self._local.put_file(key, src_path, content_type=content_type)
 
     def download_to_path(self, key: str, dest: str | Path) -> None:
         try:

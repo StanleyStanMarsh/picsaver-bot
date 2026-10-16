@@ -1,4 +1,4 @@
-"""RQ job: download Telegram photo → storage → Postgres → CLIP → Qdrant."""
+"""RQ job: download Telegram photo/GIF → storage → Postgres → CLIP → Qdrant."""
 from __future__ import annotations
 
 import hashlib
@@ -18,6 +18,7 @@ from db.models import Image
 from db.sync_session import get_sync_sessionmaker
 from media_service.qdrant_store import upsert_image_vector
 from media_service.storage import get_storage
+from loguru import logger
 
 FILE_STATUS_STORED = 2  # seed order: uploaded=1, stored=2, ...
 INDEX_STATUS_INDEXING = 2
@@ -72,6 +73,16 @@ def _content_hash(path: Path) -> str:
 
 
 def add_image(user_id: int, file_path: str, file_id: str) -> dict:
+    """Photo save job (unchanged RQ path)."""
+    return _add_media(user_id=user_id, file_path=file_path, file_id=file_id, media_type="photo")
+
+
+def add_gif(user_id: int, file_path: str, file_id: str) -> dict:
+    """GIF save job: mp4 → storage; first/mid/last frames → mean vector."""
+    return _add_media(user_id=user_id, file_path=file_path, file_id=file_id, media_type="gif")
+
+
+def _add_media(user_id: int, file_path: str, file_id: str, media_type: str) -> dict:
     """
     Persist photo for user and index it for semantic search.
     Downloads to a tempfile, stores via STORAGE_BACKEND, embeds from temp.
@@ -80,8 +91,11 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
     Publishes job.meta['phase'] at coarse steps only (download / storage /
     clip / qdrant). CLIP phase is set once at encode START — never mid-forward.
     """
+    is_gif = media_type == "gif"
+    ext = "mp4" if is_gif else "jpg"
+    content_type = "video/mp4" if is_gif else "image/jpeg"
     image_id = uuid.uuid4()
-    file_name = f"{image_id}.jpg"
+    file_name = f"{image_id}.{ext}"
     relative_path = f"{user_id}/{file_name}"
 
     proxy = PROXY_FULL_ADDRESS if PROXY_FULL_ADDRESS and "None" not in PROXY_FULL_ADDRESS else None
@@ -89,7 +103,7 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
     tmp_path: str | None = None
     try:
         _set_job_phase("download")
-        with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=f".{ext}", delete=False) as tmp:
             tmp_path = tmp.name
         try:
             download_image_by_file_path(
@@ -106,7 +120,7 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
 
         _set_job_phase("storage")
         storage = get_storage()
-        storage.put_file(relative_path, tmp_path)
+        storage.put_file(relative_path, tmp_path, content_type=content_type)
 
         Session = get_sync_sessionmaker()
         with Session() as session:
@@ -115,9 +129,10 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
             row = Image(
                 image_id=image_id,
                 path=relative_path,
-                extension="jpg",
+                extension=ext,
                 user_id=user_id,
                 telegram_file_id=file_id,
+                media_type=media_type,
                 file_status=FILE_STATUS_STORED,
                 content_hash=digest,
                 embedding_model=model_id,
@@ -130,11 +145,14 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
             session.commit()
 
         try:
-            from media_service.clip import embed_image_path
-
             # One phase at encode START; bar may sit here for tens of seconds (CPU).
-            _set_job_phase("clip")
-            vector = embed_image_path(tmp_path)
+            if is_gif:
+                vector = _embed_gif(tmp_path, user_id=user_id)
+            else:
+                from media_service.clip import embed_image_path
+
+                _set_job_phase("clip")
+                vector = embed_image_path(tmp_path)
 
             _set_job_phase("qdrant")
             upsert_image_vector(
@@ -143,6 +161,7 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
                 user_id=user_id,
                 telegram_file_id=file_id,
                 local_path=relative_path,
+                media_type=media_type,
             )
             with Session() as session:
                 img = session.get(Image, image_id)
@@ -170,6 +189,20 @@ def add_image(user_id: int, file_path: str, file_id: str) -> dict:
                 os.unlink(tmp_path)
             except OSError:
                 pass
+
+
+def _embed_gif(src_path: str, *, user_id: int) -> list[float]:
+    """Extract first/mid/last frames (ffmpeg), mean of L2-normalised vectors."""
+    from media_service.clip import embed_image_paths_mean
+    from media_service.gif_frames import extract_key_frames
+
+    with tempfile.TemporaryDirectory(prefix="gif_frames_") as frames_dir:
+        frames = extract_key_frames(src_path, frames_dir)
+        logger.info(
+            "gif frames user_id={} media_type=gif frames={}", user_id, len(frames)
+        )
+        _set_job_phase("clip")
+        return embed_image_paths_mean([str(f) for f in frames])
 
 
 def embed_text_job(text: str) -> list[float]:

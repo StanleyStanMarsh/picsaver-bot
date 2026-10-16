@@ -12,6 +12,7 @@ setup_logger()
 from utils import APP_CTX
 
 from bot_service.services.save_limits import (
+    GIF_SLOT_WEIGHT,
     SaveQuotaExceeded,
     check_queue_depth_or_raise,
     release_active_slot,
@@ -31,6 +32,7 @@ SIMILAR_MIN_SCORE = float(os.getenv("SIMILAR_MIN_SCORE", "0.35"))
 
 # String paths so RQ imports reliably inside the worker process
 SAVE_JOB = "media_service.database.save_image.add_image"
+SAVE_GIF_JOB = "media_service.database.save_image.add_gif"
 EMBED_TEXT_JOB = "media_service.database.save_image.embed_text_job"
 EMBED_IMAGE_JOB = "media_service.database.save_image.embed_image_job"
 
@@ -71,11 +73,11 @@ async def wait_for_job(
         await asyncio.sleep(interval)
 
 
-def _acquire_clip_slot(user_id: int) -> None:
-    """L5 depth then L3 per-user slot; raise typed errors (no enqueue yet)."""
+def _acquire_clip_slot(user_id: int, weight: int = 1) -> None:
+    """L5 depth then L3 per-user slot(s); raise typed errors (no enqueue yet)."""
     depth = check_queue_depth_or_raise()
-    logger.info("save queue depth={} user_id={}", depth, user_id)
-    if not try_acquire_active_slot(user_id):
+    logger.info("save queue depth={} user_id={} weight={}", depth, user_id, weight)
+    if not try_acquire_active_slot(user_id, weight):
         raise SaveQuotaExceeded(
             f"user_id={user_id} active CLIP/save slots at limit"
         )
@@ -91,9 +93,10 @@ async def _enqueue_and_wait(
     failure_ttl: int,
     log_label: str,
     on_tick: Callable[[Any], Any] | None = None,
+    slot_weight: int = 1,
 ):
     """Enqueue onto save/CLIP queue with L5 depth + L3 active-slot guards."""
-    await asyncio.to_thread(_acquire_clip_slot, user_id)
+    await asyncio.to_thread(_acquire_clip_slot, user_id, slot_weight)
     try:
         job = save_queue.enqueue(
             job_path,
@@ -105,7 +108,7 @@ async def _enqueue_and_wait(
         logger.info("{} enqueued job.id={} user_id={}", log_label, job.id, user_id)
         return await wait_for_job(job, timeout=job_timeout, on_tick=on_tick)
     finally:
-        await asyncio.to_thread(release_active_slot, user_id)
+        await asyncio.to_thread(release_active_slot, user_id, slot_weight)
 
 
 async def save_image(
@@ -113,6 +116,7 @@ async def save_image(
     user_id: int,
     file_id: str,
     on_progress: ProgressCallback | None = None,
+    media_type: str = "photo",
 ):
     """Download file meta from TG, enqueue worker job, wait for result.
 
@@ -130,7 +134,7 @@ async def save_image(
 
     await _emit("download")
     file = await bot.get_file(file_id)
-    logger.info(f"Processing file {file.file_path} for user={user_id}")
+    logger.info("Processing file {} for user={} media_type={}", file.file_path, user_id, media_type)
 
     await _emit("queue")
 
@@ -145,7 +149,7 @@ async def save_image(
 
     return await _enqueue_and_wait(
         user_id=user_id,
-        job_path=SAVE_JOB,
+        job_path=SAVE_GIF_JOB if media_type == "gif" else SAVE_JOB,
         kwargs={
             "user_id": user_id,
             "file_path": file.file_path,
@@ -154,8 +158,9 @@ async def save_image(
         job_timeout=SAVE_JOB_TIMEOUT,
         result_ttl=600,
         failure_ttl=86400,
-        log_label="Saving image job",
+        log_label=f"Saving {media_type} job",
         on_tick=_on_tick,
+        slot_weight=GIF_SLOT_WEIGHT if media_type == "gif" else 1,
     )
 
 
@@ -169,7 +174,15 @@ async def search_user_images_by_text(user_id: int, query: str, limit: int = 20) 
     if not text:
         # Empty inline: Postgres list, no CLIP / no cutoff
         images = await get_images(user_id, limit=limit)
-        return [{"file_id": img["file_id"], "score": None} for img in images]
+        return [
+            {
+                "file_id": img["file_id"],
+                "image_id": img.get("image_id"),
+                "score": None,
+                "media_type": img.get("media_type") or "photo",
+            }
+            for img in images
+        ]
 
     vector = await _enqueue_and_wait(
         user_id=user_id,

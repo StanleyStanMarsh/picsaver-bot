@@ -7,6 +7,7 @@ RUN apt-get update \
         libgomp1 \
         ca-certificates \
         git \
+        ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Official CPU wheel avoids conda MKL/iJIT symbol breakage

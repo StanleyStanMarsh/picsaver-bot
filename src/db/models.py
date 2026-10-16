@@ -35,6 +35,8 @@ class Image(Base):
     extension: Mapped[str | None] = mapped_column(Text, nullable=True)
     user_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("users.telegram_id", ondelete="CASCADE"), nullable=False)
     telegram_file_id: Mapped[str] = mapped_column(Text, nullable=False)
+    # 'photo' | 'gif' (Telegram animation stored as mp4)
+    media_type: Mapped[str] = mapped_column(Text, nullable=False, default="photo", server_default="photo")
 
     file_status: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     content_hash: Mapped[str | None] = mapped_column(Text, nullable=True)

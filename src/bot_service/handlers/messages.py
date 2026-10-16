@@ -4,6 +4,11 @@ from aiogram import Bot, F, Router, types
 
 from bot_service.services import UsersService
 from bot_service.services.save_limits import (
+    GIF_MAX_MB,
+    GIF_MAX_SEC,
+    GIF_SLOT_WEIGHT,
+    MSG_GIF_FAILED,
+    MSG_GIF_TOO_BIG,
     MSG_ALBUM_TOO_BIG,
     MSG_BUSY,
     MSG_QUOTA,
@@ -46,7 +51,7 @@ def _is_similar_caption(caption: str | None) -> bool:
     return head in ("/similar", "/similar@pic_vault_bot")
 
 
-async def _early_clip_guards(user_id: int) -> str | None:
+async def _early_clip_guards(user_id: int, weight: int = 1) -> str | None:
     """Peek L5/L3 before starting work; return user MSG or None if OK.
 
     Authoritative acquire still happens in save_image / embed paths.
@@ -55,7 +60,7 @@ async def _early_clip_guards(user_id: int) -> str | None:
     if SAVE_QUEUE_MAX_DEPTH > 0 and depth >= SAVE_QUEUE_MAX_DEPTH:
         return MSG_BUSY
     slots = await asyncio.to_thread(get_active_slots, user_id)
-    if slots >= SAVE_USER_ACTIVE_MAX:
+    if slots + weight > SAVE_USER_ACTIVE_MAX:
         return MSG_QUOTA
     return None
 
@@ -294,3 +299,106 @@ async def save_album_and_notify(
     except Exception:
         logger.exception("album save failed user_id={}", user_id)
         await _notify_or_edit(reply_to, status, MSG_SAVE_FAILED)
+
+
+MSG_GIF_SAVE_OK = "✅ GIF сохранена и проиндексирована"
+
+
+def gif_too_big(file_size: int | None, duration: int | None) -> bool:
+    """SPEC §7a caps; unknown size/duration is allowed (worker still decodes safely)."""
+    if file_size is not None and file_size > GIF_MAX_MB * 1024 * 1024:
+        return True
+    if duration is not None and duration > GIF_MAX_SEC:
+        return True
+    return False
+
+
+@router.message(F.animation)
+async def save_animation(message: types.Message, bot: Bot):
+    """Telegram GIF (sent as MP4 animation) → same limits + status bar as photo."""
+    if message.from_user is None:
+        return
+    anim = message.animation
+    await _handle_gif(message, bot, anim.file_id, anim.file_size, anim.duration)
+
+
+@router.message(F.document.mime_type == "image/gif")
+async def save_gif_document(message: types.Message, bot: Bot):
+    """.gif sent as a file (no Telegram conversion) — duration unknown up front."""
+    if message.from_user is None:
+        return
+    doc = message.document
+    await _handle_gif(message, bot, doc.file_id, doc.file_size, None)
+
+
+async def _handle_gif(
+    message: types.Message,
+    bot: Bot,
+    file_id: str,
+    file_size: int | None,
+    duration: int | None,
+) -> None:
+    user_id = message.from_user.id
+    if gif_too_big(file_size, duration):
+        logger.info(
+            "gif rejected user_id={} media_type=gif reason=too_big size={} duration={}",
+            user_id, file_size, duration,
+        )
+        await message.reply(MSG_GIF_TOO_BIG)
+        return
+
+    allowed, _ = await asyncio.to_thread(try_consume_save_quota, user_id, 1)
+    if not allowed:
+        logger.info("gif rejected user_id={} media_type=gif reason=rate_limit", user_id)
+        await message.reply(MSG_RATE_LIMIT)
+        return
+
+    early = await _early_clip_guards(user_id, GIF_SLOT_WEIGHT)
+    if early is not None:
+        logger.info("gif rejected user_id={} media_type=gif reason=early_guard", user_id)
+        await message.reply(early)
+        return
+
+    try:
+        status_msg = await message.reply(format_phase_status("download"))
+    except Exception:
+        logger.exception("failed to send gif status user_id={}", user_id)
+        status_msg = None
+
+    asyncio.create_task(save_gif_and_notify(message, bot, file_id, status_msg))
+
+
+async def save_gif_and_notify(
+    message: types.Message,
+    bot: Bot,
+    file_id: str,
+    status_message: types.Message | None = None,
+) -> None:
+    status = StatusEditor(status_message)
+    user_id = getattr(message.from_user, "id", None)
+
+    async def on_progress(phase: str) -> None:
+        await status.set_phase(phase, force=(phase in ("download", "clip", "done")))
+
+    try:
+        await UsersService().register_or_update_from_telegram(message.from_user)
+        await save_image(
+            bot=bot,
+            user_id=message.from_user.id,
+            file_id=file_id,
+            on_progress=on_progress,
+            media_type="gif",
+        )
+        await _notify_or_edit(message, status, MSG_GIF_SAVE_OK)
+    except SaveQueueBusy:
+        logger.warning("gif save busy user_id={} media_type=gif", user_id)
+        await _notify_or_edit(message, status, MSG_BUSY)
+    except SaveQuotaExceeded:
+        logger.warning("gif save quota user_id={} media_type=gif", user_id)
+        await _notify_or_edit(message, status, MSG_QUOTA)
+    except TimeoutError:
+        logger.exception("gif save timeout user_id={} media_type=gif", user_id)
+        await _notify_or_edit(message, status, MSG_SAVE_TIMEOUT)
+    except Exception:
+        logger.exception("gif save failed user_id={} media_type=gif", user_id)
+        await _notify_or_edit(message, status, MSG_GIF_FAILED)

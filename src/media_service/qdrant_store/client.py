@@ -44,6 +44,7 @@ def upsert_image_vector(
     user_id: int,
     telegram_file_id: str,
     local_path: str,
+    media_type: str = "photo",
     client: QdrantClient | None = None,
 ) -> None:
     client = client or get_qdrant_client()
@@ -59,6 +60,7 @@ def upsert_image_vector(
                     "telegram_file_id": telegram_file_id,
                     "local_path": local_path,
                     "image_id": str(image_id),
+                    "media_type": media_type,
                     "model": os.getenv("CLIP_MODEL_NAME", "jinaai/jina-clip-v2"),
                     "dimensions": VECTOR_SIZE,
                 },
@@ -158,6 +160,7 @@ def search_user_images(
                 "file_id": file_id,
                 "image_id": image_id,
                 "score": score,
+                "media_type": payload.get("media_type") or "photo",
             }
         )
         if len(out) >= limit:

@@ -1,7 +1,7 @@
 import uuid
 
 from aiogram import Router, types
-from aiogram.types import InlineQueryResultCachedPhoto
+from aiogram.types import InlineQueryResultCachedMpeg4Gif, InlineQueryResultCachedPhoto
 
 from bot_service.services.save_limits import (
     SaveQuotaExceeded,
@@ -58,12 +58,21 @@ async def inline_query(query: types.InlineQuery):
 
     results = []
     for image in images[:MAX_RESULTS]:
-        results.append(
-            InlineQueryResultCachedPhoto(
-                id=str(image.get("image_id") or uuid.uuid4()),
-                photo_file_id=image["file_id"],
+        result_id = str(image.get("image_id") or uuid.uuid4())
+        if image.get("media_type") == "gif":
+            results.append(
+                InlineQueryResultCachedMpeg4Gif(
+                    id=result_id,
+                    mpeg4_file_id=image["file_id"],
+                )
             )
-        )
+        else:
+            results.append(
+                InlineQueryResultCachedPhoto(
+                    id=result_id,
+                    photo_file_id=image["file_id"],
+                )
+            )
 
     kwargs = {
         "cache_time": 10,
@@ -74,7 +83,7 @@ async def inline_query(query: types.InlineQuery):
             kwargs["switch_pm_text"] = "Ничего не нашлось"
             kwargs["switch_pm_parameter"] = "start"
         else:
-            kwargs["switch_pm_text"] = "Сохрани фото в боте"
+            kwargs["switch_pm_text"] = "Сохрани фото или GIF в боте"
             kwargs["switch_pm_parameter"] = "start"
 
     await query.answer(results, **kwargs)

@@ -43,6 +43,14 @@ START_TEXT = (
     f"{FEEDBACK_LINK_HTML}"
 )
 
+async def _send_hit(message: Message, hit: dict) -> None:
+    """Photo → answer_photo; GIF → answer_animation (same Telegram file_id)."""
+    if hit.get("media_type") == "gif":
+        await message.answer_animation(hit["file_id"])
+    else:
+        await message.answer_photo(hit["file_id"])
+
+
 def _is_similar_caption(caption: str | None) -> bool:
     if not caption:
         return False
@@ -96,7 +104,7 @@ async def cmd_search(message: Message, command: CommandObject):
 
     await status.edit_text(f"Нашёл {len(hits)}:")
     for hit in hits:
-        await message.answer_photo(hit["file_id"])
+        await _send_hit(message, hit)
 
 
 @router.message(Command("similar"), F.photo)
@@ -151,4 +159,4 @@ async def _run_similar(message: Message, file_id: str) -> None:
 
     await status.edit_text(f"Нашёл {len(hits)} похожих:")
     for hit in hits:
-        await message.answer_photo(hit["file_id"])
+        await _send_hit(message, hit)

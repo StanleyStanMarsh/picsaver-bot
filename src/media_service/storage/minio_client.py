@@ -91,14 +91,14 @@ class MinioStorage:
             pass
         self._bucket_ready = True
 
-    def put_file(self, key: str, src_path: str | Path) -> None:
+    def put_file(self, key: str, src_path: str | Path, content_type: str = "image/jpeg") -> None:
         self._ensure_bucket()
         src = Path(src_path)
         self._client.fput_object(
             self.bucket,
             key,
             str(src),
-            content_type="image/jpeg",
+            content_type=content_type,
         )
 
     def download_to_path(self, key: str, dest: str | Path) -> None:

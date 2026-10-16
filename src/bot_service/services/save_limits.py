@@ -13,6 +13,12 @@ SAVE_USER_ACTIVE_MAX = int(os.getenv("SAVE_USER_ACTIVE_MAX", "3"))
 # 0 = disable soft reject on queue depth
 SAVE_QUEUE_MAX_DEPTH = int(os.getenv("SAVE_QUEUE_MAX_DEPTH", "50"))
 
+# GIF (SPEC §7a): size/duration caps checked in the bot before download.
+GIF_MAX_MB = int(os.getenv("GIF_MAX_MB", "20"))
+GIF_MAX_SEC = int(os.getenv("GIF_MAX_SEC", "60"))
+# One GIF = 3 model passes → occupies this many per-user active slots (capped at max).
+GIF_SLOT_WEIGHT = max(1, min(int(os.getenv("GIF_SLOT_WEIGHT", "3")), max(1, SAVE_USER_ACTIVE_MAX)))
+
 _RATE_KEY = "picsaver:save_rate:{user_id}"
 _ACTIVE_KEY = "picsaver:save_active:{user_id}"
 
@@ -77,12 +83,16 @@ def get_active_slots(user_id: int) -> int:
     return int(raw or 0)
 
 
-def try_acquire_active_slot(user_id: int) -> bool:
-    """INCR active counter; if over max, DECR and return False (no enqueue)."""
+def try_acquire_active_slot(user_id: int, weight: int = 1) -> bool:
+    """INCRBY active counter by ``weight``; if over max, roll back and return False.
+
+    A GIF costs GIF_SLOT_WEIGHT slots (3 model passes) — see SPEC §7a.
+    """
+    weight = max(1, int(weight))
     key = _ACTIVE_KEY.format(user_id=user_id)
-    new = int(redis_conn.incr(key))
+    new = int(redis_conn.incrby(key, weight))
     if new > SAVE_USER_ACTIVE_MAX:
-        redis_conn.decr(key)
+        redis_conn.decrby(key, weight)
         # Keep floor ≥ 0 if concurrent release raced
         if int(redis_conn.get(key) or 0) < 0:
             redis_conn.set(key, 0)
@@ -90,10 +100,11 @@ def try_acquire_active_slot(user_id: int) -> bool:
     return True
 
 
-def release_active_slot(user_id: int) -> None:
-    """DECR active counter with floor 0."""
+def release_active_slot(user_id: int, weight: int = 1) -> None:
+    """DECR active counter ``weight`` times with floor 0."""
     key = _ACTIVE_KEY.format(user_id=user_id)
-    _release_active_script(keys=[key])
+    for _ in range(max(1, int(weight))):
+        _release_active_script(keys=[key])
 
 
 def save_queue_depth() -> int:
@@ -125,3 +136,9 @@ MSG_QUOTA = (
 )
 MSG_SAVE_TIMEOUT = "Не удалось сохранить изображение вовремя. Попробуйте ещё раз."
 MSG_SAVE_FAILED = "Не удалось сохранить изображение вовремя. Попробуйте ещё раз."
+
+MSG_GIF_TOO_BIG = (
+    f"GIF слишком большая — до {GIF_MAX_MB} МБ и {GIF_MAX_SEC} секунд. "
+    "Попробуй покороче."
+)
+MSG_GIF_FAILED = "Не получилось обработать эту GIF. Попробуй другую."

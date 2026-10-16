@@ -61,3 +61,10 @@ def embed_text(text: str) -> list[float]:
         feats = model.get_text_features(**inputs)
         feats = feats / feats.norm(dim=-1, keepdim=True)
     return feats[0].cpu().float().numpy().tolist()
+
+
+def embed_image_paths_mean(paths: list[str]) -> list[float]:
+    """GIF: encode each frame (batch 1), L2 each → mean → L2. One vector."""
+    from media_service.gif_frames import average_normalized
+
+    return average_normalized([embed_image_path(str(p)) for p in paths])
