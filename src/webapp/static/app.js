@@ -66,10 +66,10 @@
     const data = await res.json();
     const images = data.images || [];
     if (!images.length) {
-      setStatus("Пока нет сохранённых фото. Пришли фото боту в личку.");
+      setStatus("Пока нет сохранённых фото и GIF. Пришли их боту в личку.");
       return;
     }
-    setStatus(images.length + " фото — выбери и удали ненужные");
+    setStatus(images.length + " шт. — выбери и удали ненужные");
 
     for (const item of images) {
       const card = document.createElement("button");
@@ -77,9 +77,26 @@
       card.className = "card";
       card.dataset.id = item.image_id;
 
-      const img = document.createElement("img");
-      img.alt = "";
-      img.loading = "lazy";
+      const isGif = item.media_type === "gif";
+      let img;
+      if (isGif) {
+        img = document.createElement("video");
+        img.autoplay = true;
+        img.loop = true;
+        img.muted = true;
+        img.playsInline = true;
+        img.setAttribute("muted", "");
+        img.setAttribute("playsinline", "");
+        img.className = "gif";
+        const badge = document.createElement("span");
+        badge.className = "gif-badge";
+        badge.textContent = "GIF";
+        card.appendChild(badge);
+      } else {
+        img = document.createElement("img");
+        img.alt = "";
+        img.loading = "lazy";
+      }
       card.appendChild(img);
 
       const check = document.createElement("span");
@@ -93,6 +110,7 @@
       loadImageBlob(item.image_id)
         .then((url) => {
           img.src = url;
+          if (isGif) img.play().catch(() => {});
         })
         .catch(() => {
           img.alt = "ошибка";
